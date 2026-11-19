@@ -25,7 +25,7 @@ Con el archivo abierto directamente (`file://`) la app funciona, pero sin modo o
 
 Las rutinas se cargan desde la app, en **Rutinas → + Nueva rutina**: días, ejercicios (series, reps, peso sugerido y descanso, opcionales los dos últimos), entrada en calor y elongación (ejercicio, series y reps). Se pueden guardar varias y elegir cuál está en uso; **Duplicar** sirve para armar la siguiente a partir de la actual.
 
-Al escribir el nombre de un ejercicio, la app sugiere los que ya usaste y una lista de ejercicios comunes (`EXERCISES` y `PHASE_ITEMS` en `index.html`). El peso sugerido se precarga la primera vez que hacés el ejercicio con esa rutina; después se usa el último peso real.
+Para no escribir en el teléfono, el botón con la figurita (o **+ ejercicio**) abre un selector con el cuerpo de frente y de espalda: tocás un músculo y elegís el ejercicio de la lista (`MUSCLES` en `index.html`). También hay atajos para tus ejercicios, cardio y movilidad. Al escribir el nombre de un ejercicio, la app sugiere los que ya usaste y una lista de ejercicios comunes (`EXERCISES` y `PHASE_ITEMS` en `index.html`). El peso sugerido se precarga la primera vez que hacés el ejercicio con esa rutina; después se usa el último peso real.
 
 El historial se vincula por nombre de ejercicio (sin importar mayúsculas ni tildes): si "Sentadilla copa" aparece en una rutina nueva, muestra lo que hiciste la última vez y precarga el peso. El descanso por defecto se elige en **Configuración**; si un ejercicio tiene descanso propio en la rutina, se usa ese.
 
