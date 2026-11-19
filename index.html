@@ -340,7 +340,7 @@ const LEGACY_ROUTINE = {
     ]},
   ],
 };
-const REST_SECONDS = 90;
+const REST_SECONDS = 90;   // descanso por defecto si no se eligió otro en Configuración
 const PHASES = [['warmup', 'Entrada en calor', 'Ej.: Ranas a 1 pierna'], ['cooldown', 'Elongación', 'Ej.: Isquios con banda']];
 
 /* ---------- Lista de ejercicios para el autocompletar ---------- */
@@ -434,7 +434,7 @@ function makePlan(day) {
 
 /* ---------- Datos (localStorage) ---------- */
 const KEY = 'simplegym:v1';
-let db = { v: 2, routines: [], activeId: null, sessions: [], current: null, draft: null, settings: { fontScale: 1 } };
+let db = { v: 2, routines: [], activeId: null, sessions: [], current: null, draft: null, settings: { fontScale: 1, restSeconds: REST_SECONDS } };
 let stored = null;
 try {
   const raw = localStorage.getItem(KEY);
@@ -486,6 +486,7 @@ function normalizePhases() {
 }
 if (/"items":\["|"rounds":/.test(JSON.stringify(db))) { normalizePhases(); save(); }
 
+const restDefault = () => db.settings?.restSeconds || REST_SECONDS;
 const routineById = id => db.routines.find(r => r.id === id);
 const activeRoutine = () => routineById(db.activeId) || null;
 
@@ -770,7 +771,7 @@ function toggleSet(btn) {
       $('[data-k=w]', nextRow).value = x.w;
       $('[data-k=r]', nextRow).value = x.r;
     }
-    startRest(planEx(card.dataset.ex)?.rest || REST_SECONDS);
+    startRest(planEx(card.dataset.ex)?.rest || restDefault());
   }
   row.classList.toggle('done', x.done);
   const done = sets.filter(y => y.done).length;
@@ -933,7 +934,7 @@ function dayEditor(day, di) {
             <label class="lbl">Series<input class="inp" data-p="${p}.sets" value="${esc(e.sets)}" inputmode="numeric" autocomplete="off"></label>
             <label class="lbl">Reps<input class="inp" data-p="${p}.reps" value="${esc(e.reps)}" placeholder="8–10" autocomplete="off"></label>
             <label class="lbl">Peso (kg)<input class="inp" data-p="${p}.weight" value="${esc(e.weight ?? '')}" placeholder="—" inputmode="decimal" autocomplete="off"></label>
-            <label class="lbl">Descanso (s)<input class="inp" data-p="${p}.rest" value="${esc(e.rest ?? '')}" placeholder="${REST_SECONDS}" inputmode="numeric" autocomplete="off"></label>
+            <label class="lbl">Descanso (s)<input class="inp" data-p="${p}.rest" value="${esc(e.rest ?? '')}" placeholder="${restDefault()}" inputmode="numeric" autocomplete="off"></label>
           </div>
           <div class="ed-tools">
             <button class="icon-btn" data-act="ed-move" data-p="${p}" data-dir="-1" ${ei === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
@@ -973,7 +974,7 @@ function saveDraft() {
       sets: clampInt(e.sets, 1, 10, 3),
       reps: String(e.reps ?? '').trim(),
       weight: String(e.weight ?? '').trim().replace(',', '.') || null,
-      rest: String(e.rest ?? '').trim() ? clampInt(e.rest, 10, 600, REST_SECONDS) : null,
+      rest: String(e.rest ?? '').trim() ? clampInt(e.rest, 10, 600, restDefault()) : null,
     })),
   }));
   if (!days.length) return toast('Agregá al menos un día');
@@ -1058,6 +1059,7 @@ function renderHistory() {
 
 /* ---------- Configuración ---------- */
 const FONT_SIZES = [['Chica', 0.9], ['Normal', 1], ['Grande', 1.15], ['Muy grande', 1.3]];
+const REST_OPTIONS = [60, 90, 120, 180];
 
 // Escala toda la interfaz (texto y botones) con zoom: la app está maquetada en px.
 function applySettings() {
@@ -1077,6 +1079,16 @@ function renderSettings() {
           ${FONT_SIZES.map(([name, z]) => `
             <button role="radio" aria-checked="${z === cur}" class="${z === cur ? 'on' : ''}" data-act="font" data-scale="${z}">
               <b style="font-size:${Math.round(18 * z)}px">Aa</b><span>${name}</span>
+            </button>`).join('')}
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="set-title" id="rest-title">Descanso por defecto</h2>
+        <p class="muted set-desc">Para los ejercicios que no tienen un descanso propio en la rutina.</p>
+        <div class="seg" role="radiogroup" aria-labelledby="rest-title">
+          ${REST_OPTIONS.map(sec => `
+            <button role="radio" aria-checked="${sec === restDefault()}" class="${sec === restDefault() ? 'on' : ''}" data-act="rest-default" data-sec="${sec}">
+              <b style="font-size:20px">${mmss(sec * 1000)}</b><span>min</span>
             </button>`).join('')}
         </div>
       </section>
@@ -1170,6 +1182,8 @@ app.addEventListener('click', ev => {
       }
       break;
     case 'export': exportData(); break;
+    case 'rest-default':
+      db.settings = { ...db.settings, restSeconds: +b.dataset.sec }; save(); render(); break;
     case 'font':
       db.settings = { ...db.settings, fontScale: +b.dataset.scale }; save(); applySettings(); render(); break;
     case 'import': $('#file').click(); break;
@@ -1226,7 +1240,7 @@ function beep() {
     o.start(t0 + d); o.stop(t0 + d + 0.2);
   });
 }
-function startRest(sec = REST_SECONDS) {
+function startRest(sec = restDefault()) {
   clearTimeout(rest.hideId);
   Object.assign(rest, { end: Date.now() + sec * 1000, total: sec, fired: false });
   restEl.classList.remove('over');
