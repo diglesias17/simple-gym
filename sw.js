@@ -1,5 +1,5 @@
 // Cambiar la versión al modificar archivos para forzar la actualización del caché.
-const CACHE = 'simplegym-v3';
+const CACHE = 'simplegym-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,10 @@ const ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
+  './fonts/Barlow-500.woff2',
+  './fonts/Barlow-600.woff2',
+  './fonts/Barlow-700.woff2',
+  './fonts/BarlowCondensed-700.woff2',
 ];
 
 self.addEventListener('install', e => {
