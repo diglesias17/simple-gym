@@ -1,5 +1,5 @@
 // Cambiar la versión al modificar archivos para forzar la actualización del caché.
-const CACHE = 'simplegym-v2';
+const CACHE = 'simplegym-v3';
 const ASSETS = [
   './',
   './index.html',

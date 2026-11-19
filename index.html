@@ -85,7 +85,8 @@
   .wu-head, .wu-row { display: grid; grid-template-columns: 1fr 48px 48px; gap: 8px; align-items: center; }
   .wu-head { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
   .wu-row { padding: 6px 0; border-top: 1px solid var(--line); font-size: 15px; }
-  .wu-head + .wu-row { border-top: 0; }
+  .wu-head + .wu-row, summary + .wu-row { border-top: 0; }
+  summary + .wu-row { margin-top: 6px; }
 
   /* Exercises */
   .ex-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
@@ -110,6 +111,7 @@
   .spacer { flex: 1; }
   .mini { padding: 8px 12px; border-radius: 10px; background: var(--surface-2); font-size: 14px; font-weight: 600; }
 
+  .notes { display: block; }
   .notes span { display: block; font-weight: 700; margin-bottom: 8px; }
   .notes textarea { width: 100%; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; padding: 10px; resize: vertical; }
   .primary { width: 100%; background: var(--accent); color: var(--accent-ink); font-weight: 800; border-radius: var(--radius); padding: 16px; font-size: 17px; margin-top: 8px; }
@@ -124,6 +126,39 @@
   .hist-note { font-size: 14px; color: var(--muted); white-space: pre-wrap; }
   .empty { text-align: center; color: var(--muted); padding: 40px 0; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row.nowrap { flex-wrap: nowrap; gap: 0; }
+  .hist-sub { font-size: 13px; margin: 8px 0 0; }
+
+  /* Rutinas */
+  .rt.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .rt-name { font-size: 19px; font-weight: 800; }
+  .rt .row { margin-top: 4px; }
+  .mini.danger { color: var(--danger); }
+  .accent-text { color: var(--accent); }
+  .empty-card h2 { font-size: 18px; }
+  .empty-card p { font-size: 14px; }
+
+  /* Editor */
+  .lbl { display: block; font-size: 12px; font-weight: 700; color: var(--muted); min-width: 0; }
+  .lbl .inp { margin-top: 4px; }
+  .lbl + .lbl { margin-top: 10px; }
+  .inp { display: block; width: 100%; min-width: 0; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2);
+    color: var(--text); font: 500 16px/1.2 system-ui, sans-serif; padding: 0 12px; }
+  textarea.inp { height: auto; padding: 10px 12px; resize: vertical; }
+  .inp:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .inp::placeholder { color: var(--muted); opacity: .7; }
+  .ed-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .ed-head h2 { font-size: 17px; }
+  .lbl.inline { display: flex; align-items: center; gap: 8px; }
+  .lbl.inline .inp { margin: 0; width: 64px; height: 38px; padding: 0 8px; }
+  .ed-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .day-inp { font-size: 18px; font-weight: 800; }
+  .ed-ex { border-top: 1px solid var(--line); padding: 10px 0 8px; }
+  .ed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ed-grid .lbl { margin-top: 0; }
+  .ed-tools { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  .icon-btn { flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--surface-2); font-weight: 700; color: var(--muted); }
+  .hint { font-size: 13px; margin: 0 0 8px; }
 
   /* Rest timer */
   .rest { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--surface); border-top: 1px solid var(--line);
@@ -157,8 +192,8 @@
 <div id="toast" class="toast" hidden></div>
 
 <script>
-/* ---------- Rutina ---------- */
-const ROUTINE = {
+/* ---------- Rutina original (solo para migrar los datos de la versión anterior) ---------- */
+const LEGACY_ROUTINE = {
   note: 'Las repeticiones son iniciales: pueden cambiar según suba la carga. Mantener y priorizar la técnica siempre.',
   warmup: {
     rounds: 2,
@@ -169,7 +204,7 @@ const ROUTINE = {
       '10 × Flexión de cadera con bastón',
     ],
   },
-  // [id, nombre, series, reps objetivo]
+  // [id viejo, nombre, series, reps objetivo]
   days: [
     { id: 'd1', name: 'Día 1', ex: [
       ['sentadilla-copa', 'Sentadilla copa', 4, '8–10'],
@@ -207,49 +242,104 @@ const ROUTINE = {
   ],
 };
 const REST_SECONDS = 90;
-
-/* ---------- Datos (localStorage) ---------- */
-const KEY = 'simplegym:v1';
-let db = { sessions: [], current: null };
-try {
-  const raw = localStorage.getItem(KEY);
-  if (raw) db = Object.assign(db, JSON.parse(raw));
-} catch {}
-function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} }
-if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
+const MAX_ROUNDS = 4;
+const PHASES = [['warmup', 'Entrada en calor', 'Ej.: 10 × Ranas a 1 pierna'], ['cooldown', 'Elongación', 'Ej.: 30" Isquios con banda']];
 
 /* ---------- Utilidades ---------- */
 const $ = (s, el = document) => el.querySelector(s);
 const app = $('#app');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const dayById = id => ROUTINE.days.find(d => d.id === id);
-const exList = day => (day?.ex || []).map(([id, name, sets, reps]) => ({ id, name, sets, reps }));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const firstNum = s => (String(s).match(/\d+/) || [''])[0];
 const fmtDate = t => new Date(t).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtTime = t => new Date(t).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 const fmtDur = ms => { const m = Math.floor(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; };
 const mmss = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const fmtSet = x => x.w ? `${x.w}×${x.r || '?'}` : `${x.r || '?'}`;
+const clampInt = (v, min, max, def) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def; };
+// Clave de un ejercicio a partir del nombre: sin tildes ni mayúsculas. Vincula el historial entre rutinas.
+const exKey = name => String(name).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'ejercicio';
+const emptyPhase = () => ({ rounds: 1, items: [] });
+const phaseTotal = p => p ? p.items.length * p.rounds : 0;
 
-function toast(msg) {
-  const t = $('#toast'); t.textContent = msg; t.hidden = false;
-  clearTimeout(toast.id); toast.id = setTimeout(() => t.hidden = true, 2200);
+// Plan de un día con claves únicas (si un ejercicio se repite en el mismo día, la segunda vez es "-2").
+function makePlan(day) {
+  const seen = {};
+  return day.ex.map(e => {
+    let key = exKey(e.name);
+    seen[key] = (seen[key] || 0) + 1;
+    if (seen[key] > 1) key += '-' + seen[key];
+    return { key, name: e.name, sets: e.sets, reps: e.reps, rest: e.rest || null };
+  });
 }
 
-function lastSets(exId) {
+/* ---------- Datos (localStorage) ---------- */
+const KEY = 'simplegym:v1';
+let db = { v: 2, routines: [], activeId: null, sessions: [], current: null, draft: null };
+let stored = null;
+try {
+  const raw = localStorage.getItem(KEY);
+  if (raw) stored = JSON.parse(raw);
+} catch {}
+if (stored) db = Object.assign(db, stored);
+function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} }
+if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
+
+function legacyRoutine() {
+  const L = LEGACY_ROUTINE;
+  return {
+    id: 'r1', name: 'Rutina inicial', note: L.note, created: Date.now(),
+    warmup: { rounds: L.warmup.rounds, items: [...L.warmup.items] }, cooldown: emptyPhase(),
+    days: L.days.map(d => ({ id: d.id, name: d.name, ex: d.ex.map(([, name, sets, reps]) => ({ name, sets, reps, rest: null })) })),
+  };
+}
+const LEGACY_NAMES = Object.fromEntries(LEGACY_ROUTINE.days.flatMap(d => d.ex.map(([id, name]) => [id, name])));
+
+// Convierte una sesión de la versión 1 (ejercicios con id fijo) al formato actual.
+function upgradeSession(s) {
+  if (!s || s.plan) return s;
+  const day = legacyRoutine().days.find(d => d.id === s.dayId);
+  const ex = {};
+  for (const [id, sets] of Object.entries(s.ex || {})) ex[LEGACY_NAMES[id] ? exKey(LEGACY_NAMES[id]) : id] = sets;
+  return {
+    ...s, ex, routineId: 'r1', routineName: 'Rutina inicial', dayName: day?.name || '?',
+    plan: day ? makePlan(day) : [],
+    phases: { warmup: { rounds: LEGACY_ROUTINE.warmup.rounds, items: [...LEGACY_ROUTINE.warmup.items] }, cooldown: emptyPhase() },
+    warmup: s.warmup || [], cooldown: [],
+  };
+}
+
+if (stored && stored.v !== 2) {
+  db.routines = [legacyRoutine()];
+  db.activeId = 'r1';
+  db.sessions = (db.sessions || []).map(upgradeSession);
+  db.current = upgradeSession(db.current);
+  db.v = 2;
+  save();
+}
+
+const routineById = id => db.routines.find(r => r.id === id);
+const activeRoutine = () => routineById(db.activeId) || null;
+
+function lastSets(key) {
   for (let i = db.sessions.length - 1; i >= 0; i--) {
     const s = db.sessions[i];
-    const sets = s.ex?.[exId]?.filter(x => x.done);
+    const sets = s.ex?.[key]?.filter(x => x.done);
     if (sets?.length) return { date: s.start, sets };
   }
   return null;
 }
-const lastOfDay = id => [...db.sessions].reverse().find(s => s.dayId === id);
-function nextDayId() {
-  const last = db.sessions.at(-1);
-  if (!last) return ROUTINE.days[0].id;
-  const i = ROUTINE.days.findIndex(d => d.id === last.dayId);
-  return ROUTINE.days[(i + 1) % ROUTINE.days.length].id;
+const lastOfDay = (r, dayId) => [...db.sessions].reverse().find(s => s.routineId === r.id && s.dayId === dayId);
+function nextDayId(r) {
+  const last = [...db.sessions].reverse().find(s => s.routineId === r.id);
+  const i = last ? r.days.findIndex(d => d.id === last.dayId) : -1;
+  return r.days[(i + 1) % r.days.length]?.id;
+}
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.id); toast.id = setTimeout(() => t.hidden = true, 2200);
 }
 
 /* ---------- Navegación ---------- */
@@ -261,62 +351,79 @@ function render() {
   const v = view();
   if (v === 'session' && db.current) renderSession();
   else if (v === 'history') renderHistory();
+  else if (v === 'routines') renderRoutines();
+  else if (v === 'edit') db.draft ? renderEditor() : go('routines');
   else renderHome();
   keepAwake(v === 'session' && !!db.current);
 }
 
 /* ---------- Inicio ---------- */
 function renderHome() {
-  const next = nextDayId(), cur = db.current;
+  const r = activeRoutine(), cur = db.current;
+  const next = r && !cur ? nextDayId(r) : null;
   app.innerHTML = `
     <header class="bar">
       <span class="brand">Simple<span>Gym</span></span><span></span>
-      <button class="ghost" data-act="history">Historial</button>
+      <span class="row nowrap">
+        <button class="ghost" data-act="routines">Rutinas</button>
+        <button class="ghost" data-act="history">Historial</button>
+      </span>
     </header>
     ${cur ? `
       <button class="resume" data-act="resume">
-        <span><b>Sesión en curso</b><small>${esc(dayById(cur.dayId)?.name)} · desde las ${fmtTime(cur.start)}</small></span>
+        <span><b>Sesión en curso</b><small>${esc(cur.dayName)} · desde las ${fmtTime(cur.start)}</small></span>
         <span class="arrow">Continuar →</span>
       </button>` : ''}
-    <div class="section-title">Elegí el día</div>
-    ${ROUTINE.days.map(d => {
-      const last = lastOfDay(d.id);
-      return `
-      <button class="day ${d.id === next && !cur ? 'next' : ''}" data-act="start" data-day="${d.id}">
-        <div class="day-top"><span class="day-name">${d.name}</span>${d.id === next && !cur ? '<span class="pill">Siguiente</span>' : ''}</div>
-        <div class="day-ex">${d.ex.map(e => esc(e[1])).join(' · ')}</div>
-        <div class="day-last">${last ? 'Último: ' + fmtDate(last.start) : '<span class="muted">Sin registros</span>'}</div>
-      </button>`;
-    }).join('')}
-    <p class="note">${esc(ROUTINE.note)}</p>`;
+    ${r ? `
+      <div class="section-title">${esc(r.name)} · elegí el día</div>
+      ${r.days.map(d => {
+        const last = lastOfDay(r, d.id);
+        return `
+        <button class="day ${d.id === next ? 'next' : ''}" data-act="start" data-day="${esc(d.id)}">
+          <div class="day-top"><span class="day-name">${esc(d.name)}</span>${d.id === next ? '<span class="pill">Siguiente</span>' : ''}</div>
+          <div class="day-ex">${d.ex.map(e => esc(e.name)).join(' · ')}</div>
+          <div class="day-last">${last ? 'Último: ' + fmtDate(last.start) : '<span class="muted">Sin registros</span>'}</div>
+        </button>`;
+      }).join('')}
+      ${r.note ? `<p class="note">${esc(r.note)}</p>` : ''}` : `
+      <div class="card empty-card">
+        <h2>Todavía no hay rutinas</h2>
+        <p class="muted">Cargá la rutina que te dieron: días, ejercicios, series y repeticiones.</p>
+        <button class="primary" data-act="new-routine">Crear rutina</button>
+      </div>`}`;
 }
 
 function startSession(dayId) {
+  const r = activeRoutine(), day = r?.days.find(d => d.id === dayId);
+  if (!day) return;
   if (db.current) {
-    if (db.current.dayId === dayId) return go('session');
-    const name = dayById(db.current.dayId)?.name;
-    if (!confirm(`Tenés una sesión en curso (${name}). ¿Descartarla y empezar ${dayById(dayId).name}?`)) return;
+    if (db.current.routineId === r.id && db.current.dayId === dayId) return go('session');
+    if (!confirm(`Tenés una sesión en curso (${db.current.dayName}). ¿Descartarla y empezar ${day.name}?`)) return;
   }
-  const ex = {};
-  for (const e of exList(dayById(dayId))) {
-    const last = lastSets(e.id);
-    ex[e.id] = Array.from({ length: e.sets }, (_, i) => ({
+  const plan = makePlan(day), ex = {};
+  for (const e of plan) {
+    const last = lastSets(e.key);
+    ex[e.key] = Array.from({ length: e.sets }, (_, i) => ({
       w: last ? (last.sets[i] ?? last.sets.at(-1)).w : '',
       r: '', done: false,
     }));
   }
-  db.current = { id: Date.now().toString(36), dayId, start: Date.now(), warmup: [], ex, note: '' };
+  db.current = {
+    id: uid(), routineId: r.id, routineName: r.name, dayId, dayName: day.name, start: Date.now(),
+    plan, phases: { warmup: structuredClone(r.warmup), cooldown: structuredClone(r.cooldown) },
+    warmup: [], cooldown: [], ex, note: '',
+  };
   save();
   go('session');
 }
 
 /* ---------- Sesión ---------- */
 function exCard(e, sets) {
-  const last = lastSets(e.id);
+  const last = lastSets(e.key);
   const done = sets.filter(x => x.done).length;
   return `
-  <article class="card ex ${done >= sets.length ? 'complete' : ''}" data-ex="${e.id}">
-    <div class="ex-head"><h2>${esc(e.name)}</h2><span class="target">${e.sets} × ${esc(e.reps)}</span></div>
+  <article class="card ex ${done >= sets.length ? 'complete' : ''}" data-ex="${esc(e.key)}">
+    <div class="ex-head"><h2>${esc(e.name)}</h2><span class="target">${e.reps ? `${e.sets} × ${esc(e.reps)}` : `${e.sets} series`}</span></div>
     <div class="prev">${last ? `Anterior (${fmtDate(last.date)}): ${last.sets.map(fmtSet).join(' · ')}` : 'Primera vez'}</div>
     ${sets.map((x, i) => {
       const ph = (last?.sets[i] ?? last?.sets.at(-1))?.r || firstNum(e.reps);
@@ -336,27 +443,37 @@ function exCard(e, sets) {
   </article>`;
 }
 
+// Entrada en calor / elongación: lista de ítems con un check por vuelta. Si no tiene ítems, no se muestra.
+function phaseCard(kind, title) {
+  const s = db.current, p = s.phases?.[kind];
+  if (!p?.items.length) return '';
+  const st = s[kind] ||= [], total = phaseTotal(p), done = st.filter(Boolean).length;
+  const cols = `style="grid-template-columns: 1fr repeat(${p.rounds}, 48px)"`;
+  return `
+    <details class="card" ${done < total ? 'open' : ''}>
+      <summary><span>${title}</span><span class="count" data-count="${kind}">${done}/${total}</span></summary>
+      ${p.rounds > 1 ? `<div class="wu-head" ${cols}><span></span>${Array.from({ length: p.rounds }, (_, r) => `<span>Vuelta ${r + 1}</span>`).join('')}</div>` : ''}
+      ${p.items.map((it, i) => `
+        <div class="wu-row" ${cols}><span>${esc(it)}</span>
+          ${Array.from({ length: p.rounds }, (_, r) => {
+            const k = r * p.items.length + i;
+            return `<button class="check sm ${st[k] ? 'on' : ''}" data-act="phase" data-phase="${kind}" data-k="${k}" aria-label="${p.rounds > 1 ? `Vuelta ${r + 1}` : 'Hecho'}">✓</button>`;
+          }).join('')}
+        </div>`).join('')}
+    </details>`;
+}
+
 function renderSession() {
-  const s = db.current, day = dayById(s.dayId), wu = ROUTINE.warmup;
-  const wuTotal = wu.items.length * wu.rounds, wuDone = s.warmup.filter(Boolean).length;
+  const s = db.current;
   app.innerHTML = `
     <header class="bar sticky">
       <button class="ghost" data-act="home">← Inicio</button>
-      <h1>${esc(day.name)}</h1>
+      <h1>${esc(s.dayName)}</h1>
       <span class="elapsed" id="elapsed">${fmtDur(Date.now() - s.start)}</span>
     </header>
-    <details class="card" ${wuDone < wuTotal ? 'open' : ''}>
-      <summary><span>Entrada en calor · movilidad</span><span class="count" id="wu-count">${wuDone}/${wuTotal}</span></summary>
-      <div class="wu-head"><span></span>${Array.from({ length: wu.rounds }, (_, r) => `<span>Vuelta ${r + 1}</span>`).join('')}</div>
-      ${wu.items.map((it, i) => `
-        <div class="wu-row"><span>${esc(it)}</span>
-          ${Array.from({ length: wu.rounds }, (_, r) => {
-            const k = r * wu.items.length + i;
-            return `<button class="check sm ${s.warmup[k] ? 'on' : ''}" data-act="wu" data-k="${k}" aria-label="Vuelta ${r + 1}">✓</button>`;
-          }).join('')}
-        </div>`).join('')}
-    </details>
-    ${exList(day).map(e => exCard(e, s.ex[e.id] ||= [])).join('')}
+    ${phaseCard('warmup', 'Entrada en calor')}
+    ${s.plan.map(e => exCard(e, s.ex[e.key] ||= Array.from({ length: e.sets }, () => ({ w: '', r: '', done: false })))).join('')}
+    ${phaseCard('cooldown', 'Elongación')}
     <label class="card notes"><span>Notas</span>
       <textarea data-k="note" rows="3" placeholder="Sensaciones, cambios de carga, molestias…">${esc(s.note)}</textarea>
     </label>
@@ -364,10 +481,11 @@ function renderSession() {
     <button class="ghost danger block" data-act="discard">Descartar sesión</button>`;
 }
 
+const planEx = key => db.current.plan.find(x => x.key === key);
+
 function refreshCard(card) {
-  const s = db.current;
-  const e = exList(dayById(s.dayId)).find(x => x.id === card.dataset.ex);
-  card.outerHTML = exCard(e, s.ex[e.id]);
+  const e = planEx(card.dataset.ex);
+  card.outerHTML = exCard(e, db.current.ex[e.key]);
 }
 
 function toggleSet(btn) {
@@ -385,7 +503,7 @@ function toggleSet(btn) {
       $('[data-k=w]', nextRow).value = x.w;
       $('[data-k=r]', nextRow).value = x.r;
     }
-    startRest();
+    startRest(planEx(card.dataset.ex)?.rest || REST_SECONDS);
   }
   row.classList.toggle('done', x.done);
   const done = sets.filter(y => y.done).length;
@@ -405,6 +523,213 @@ function finish() {
   toast('Sesión guardada 💪');
 }
 
+/* ---------- Rutinas ---------- */
+function renderRoutines() {
+  app.innerHTML = `
+    <header class="bar">
+      <button class="ghost" data-act="home">← Inicio</button><h1>Rutinas</h1><span></span>
+    </header>
+    ${db.draft ? `
+      <button class="resume" data-act="resume-draft">
+        <span><b>Borrador sin guardar</b><small>${esc(db.draft.name || 'Sin nombre')}</small></span>
+        <span class="arrow">Seguir →</span>
+      </button>` : ''}
+    ${db.routines.map(r => {
+      const active = r.id === db.activeId, id = esc(r.id);
+      return `
+      <div class="card rt ${active ? 'active' : ''}">
+        <div class="day-top"><span class="rt-name">${esc(r.name)}</span>${active ? '<span class="pill">En uso</span>' : ''}</div>
+        <div class="day-ex">${r.days.length} ${r.days.length === 1 ? 'día' : 'días'} · ${r.days.reduce((n, d) => n + d.ex.length, 0)} ejercicios</div>
+        <div class="row">
+          ${active ? '' : `<button class="mini" data-act="use-routine" data-id="${id}">Usar</button>`}
+          <button class="mini" data-act="edit-routine" data-id="${id}">Editar</button>
+          <button class="mini" data-act="dup-routine" data-id="${id}">Duplicar</button>
+          ${active ? '' : `<button class="mini danger" data-act="del-routine" data-id="${id}">Eliminar</button>`}
+        </div>
+      </div>`;
+    }).join('') || '<p class="empty">Todavía no hay rutinas.</p>'}
+    <button class="primary" data-act="new-routine">+ Nueva rutina</button>`;
+}
+
+/* ---------- Editor de rutinas ---------- */
+// Se edita un borrador (db.draft) que se guarda en cada tecla; la rutina real cambia recién al tocar "Guardar".
+const newEx = () => ({ name: '', sets: '3', reps: '', rest: '' });
+const newDay = n => ({ id: uid(), name: `Día ${n}`, ex: [newEx()] });
+
+function openEditor(routine, copy = false) {
+  if (routine && !copy && db.draft?.draftOf === routine.id) return go('edit');
+  if (db.draft && !confirm(`Tenés un borrador sin guardar (${db.draft.name || 'sin nombre'}). ¿Descartarlo?`)) return;
+  if (routine) {
+    db.draft = structuredClone(routine);
+    db.draft.draftOf = copy ? null : routine.id;
+    if (copy) { db.draft.name += ' (copia)'; delete db.draft.created; }
+  } else {
+    db.draft = { name: '', note: '', warmup: emptyPhase(), cooldown: emptyPhase(), days: [newDay(1)], draftOf: null };
+  }
+  save(); go('edit');
+}
+
+function renderEditor() {
+  const d = db.draft;
+  app.innerHTML = `
+    <header class="bar sticky">
+      <button class="ghost" data-act="ed-cancel">Cancelar</button>
+      <h1>${d.draftOf ? 'Editar rutina' : 'Nueva rutina'}</h1>
+      <button class="ghost accent-text" data-act="ed-save">Guardar</button>
+    </header>
+    <div class="card">
+      <label class="lbl">Nombre<input class="inp" data-p="name" value="${esc(d.name)}" placeholder="Ej.: Rutina noviembre" autocomplete="off"></label>
+      <label class="lbl">Nota (opcional)<textarea class="inp" data-p="note" rows="2" placeholder="Aclaraciones generales">${esc(d.note)}</textarea></label>
+    </div>
+    ${phaseEditor(...PHASES[0])}
+    ${d.days.map(dayEditor).join('')}
+    <button class="mini block" data-act="ed-add-day">+ Agregar día</button>
+    ${phaseEditor(...PHASES[1])}
+    <button class="primary" data-act="ed-save">Guardar rutina</button>
+    <button class="ghost block" data-act="ed-cancel">Cancelar</button>
+    ${datalist('ex-names', knownNames(r => r.days.flatMap(day => day.ex.map(e => e.name)), s => (s.plan || []).map(e => e.name)))}
+    ${datalist('phase-items', knownNames(r => [...r.warmup.items, ...r.cooldown.items], s => PHASES.flatMap(([k]) => s.phases?.[k]?.items || [])))}`;
+}
+
+// Nombres ya usados en rutinas guardadas e historial, para sugerir al escribir.
+// Sin duplicados (por clave de nombre) y con la escritura más reciente.
+function knownNames(fromRoutine, fromSession) {
+  const seen = new Map();
+  const add = n => { const k = exKey(n); if (n && !seen.has(k)) seen.set(k, n); };
+  [...db.routines].reverse().forEach(r => fromRoutine(r).forEach(add));
+  [...db.sessions].reverse().forEach(s => fromSession(s).forEach(add));
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'es'));
+}
+const datalist = (id, names) => `<datalist id="${id}">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>`;
+
+function phaseEditor(kind, title, ph) {
+  const p = db.draft[kind];
+  return `
+    <section class="card">
+      <div class="ed-head"><h2>${title}</h2>
+        <label class="lbl inline">Vueltas
+          <select class="inp" data-p="${kind}.rounds">${Array.from({ length: MAX_ROUNDS }, (_, i) =>
+            `<option ${i + 1 === +p.rounds ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>
+        </label>
+      </div>
+      ${p.items.length ? '' : '<p class="muted hint">Vacía: no aparece en la sesión.</p>'}
+      ${p.items.map((it, i) => `
+        <div class="ed-row">
+          <input class="inp" list="phase-items" data-p="${kind}.items.${i}" value="${esc(it)}" placeholder="${esc(ph)}" autocomplete="off">
+          <button class="icon-btn" data-act="ed-del" data-p="${kind}.items.${i}" aria-label="Quitar ítem">✕</button>
+        </div>`).join('')}
+      <button class="mini" data-act="ed-add-item" data-phase="${kind}">+ ítem</button>
+    </section>`;
+}
+
+function dayEditor(day, di) {
+  return `
+    <section class="card">
+      <div class="ed-row">
+        <input class="inp day-inp" data-p="days.${di}.name" value="${esc(day.name)}" placeholder="Nombre del día" autocomplete="off">
+        <button class="icon-btn" data-act="ed-del" data-p="days.${di}" aria-label="Eliminar día">✕</button>
+      </div>
+      ${day.ex.map((e, ei) => {
+        const p = `days.${di}.ex.${ei}`;
+        return `
+        <div class="ed-ex">
+          <div class="ed-row"><span class="n">${ei + 1}</span>
+            <input class="inp" list="ex-names" data-p="${p}.name" value="${esc(e.name)}" placeholder="Ejercicio" autocomplete="off"></div>
+          <div class="ed-grid">
+            <label class="lbl">Series<input class="inp" data-p="${p}.sets" value="${esc(e.sets)}" inputmode="numeric" autocomplete="off"></label>
+            <label class="lbl">Reps<input class="inp" data-p="${p}.reps" value="${esc(e.reps)}" placeholder="8–10" autocomplete="off"></label>
+            <label class="lbl">Descanso (s)<input class="inp" data-p="${p}.rest" value="${esc(e.rest ?? '')}" placeholder="${REST_SECONDS}" inputmode="numeric" autocomplete="off"></label>
+          </div>
+          <div class="ed-tools">
+            <button class="icon-btn" data-act="ed-move" data-p="${p}" data-dir="-1" ${ei === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
+            <button class="icon-btn" data-act="ed-move" data-p="${p}" data-dir="1" ${ei === day.ex.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button>
+            <button class="icon-btn" data-act="ed-del" data-p="${p}" aria-label="Quitar ejercicio">✕</button>
+          </div>
+        </div>`;
+      }).join('')}
+      <button class="mini" data-act="ed-add-ex" data-d="${di}">+ ejercicio</button>
+    </section>`;
+}
+
+// "days.0.ex.2.name" → [objeto contenedor, clave]
+function draftRef(path) {
+  const k = path.split('.'), last = k.pop();
+  let o = db.draft;
+  for (const x of k) o = o[x];
+  return [o, last];
+}
+function editAndFocus(selector) {
+  save(); renderEditor();
+  const el = $(selector, app);
+  if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); }
+}
+
+function saveDraft() {
+  const d = db.draft;
+  const name = String(d.name).trim();
+  if (!name) { toast('Poné un nombre a la rutina'); return $('[data-p="name"]', app)?.focus(); }
+  const phase = p => ({ rounds: clampInt(p.rounds, 1, MAX_ROUNDS, 1), items: p.items.map(s => String(s).trim()).filter(Boolean) });
+  const days = d.days.map((day, i) => ({
+    id: day.id || uid(),
+    name: String(day.name).trim() || `Día ${i + 1}`,
+    ex: day.ex.filter(e => String(e.name).trim()).map(e => ({
+      name: String(e.name).trim(),
+      sets: clampInt(e.sets, 1, 10, 3),
+      reps: String(e.reps ?? '').trim(),
+      rest: String(e.rest ?? '').trim() ? clampInt(e.rest, 10, 600, REST_SECONDS) : null,
+    })),
+  }));
+  if (!days.length) return toast('Agregá al menos un día');
+  const empty = days.find(day => !day.ex.length);
+  if (empty) return toast(`${empty.name} no tiene ejercicios`);
+  const r = { id: d.draftOf || uid(), name, note: String(d.note).trim(), created: d.created || Date.now(),
+    warmup: phase(d.warmup), cooldown: phase(d.cooldown), days };
+  const i = db.routines.findIndex(x => x.id === r.id);
+  if (i >= 0) db.routines[i] = r; else db.routines.push(r);
+  db.draft = null;
+  if (!activeRoutine() || (i < 0 && confirm(`¿Empezar a usar "${r.name}" ahora?`))) db.activeId = r.id;
+  save();
+  go(db.activeId === r.id && i < 0 ? '' : 'routines');
+  toast('Rutina guardada');
+}
+
+function editorClick(b) {
+  const d = db.draft;
+  switch (b.dataset.act) {
+    case 'ed-save': return saveDraft(), true;
+    case 'ed-cancel':
+      if (confirm('¿Descartar los cambios de esta rutina?')) { db.draft = null; save(); go('routines'); }
+      return true;
+    case 'ed-add-day':
+      d.days.push(newDay(d.days.length + 1));
+      return editAndFocus(`[data-p="days.${d.days.length - 1}.ex.0.name"]`), true;
+    case 'ed-add-ex': {
+      const di = +b.dataset.d, ex = d.days[di].ex;
+      ex.push(newEx());
+      return editAndFocus(`[data-p="days.${di}.ex.${ex.length - 1}.name"]`), true;
+    }
+    case 'ed-add-item': {
+      const kind = b.dataset.phase, items = d[kind].items;
+      items.push('');
+      return editAndFocus(`[data-p="${kind}.items.${items.length - 1}"]`), true;
+    }
+    case 'ed-del': {
+      const [arr, i] = draftRef(b.dataset.p);
+      if (/^days\.\d+$/.test(b.dataset.p) && arr[i].ex.some(e => String(e.name).trim())
+        && !confirm(`¿Eliminar ${arr[i].name || 'este día'} con todos sus ejercicios?`)) return true;
+      arr.splice(+i, 1);
+      return save(), renderEditor(), true;
+    }
+    case 'ed-move': {
+      const [arr, i] = draftRef(b.dataset.p), j = +i + +b.dataset.dir;
+      if (j < 0 || j >= arr.length) return true;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return save(), renderEditor(), true;
+    }
+  }
+  return false;
+}
+
 /* ---------- Historial ---------- */
 function renderHistory() {
   const list = [...db.sessions].reverse();
@@ -413,21 +738,21 @@ function renderHistory() {
       <button class="ghost" data-act="home">← Inicio</button><h1>Historial</h1><span></span>
     </header>
     ${list.length ? list.map(s => {
-      const day = dayById(s.dayId);
       const done = Object.values(s.ex || {}).flat().filter(x => x.done).length;
       return `
       <details class="card hist">
-        <summary><span><b>${esc(day?.name || '?')}</b> · ${fmtDate(s.start)}</span>
+        <summary><span><b>${esc(s.dayName || '?')}</b> · ${fmtDate(s.start)}</span>
           <span class="muted">${fmtDur(s.end - s.start)} · ${done} series</span></summary>
-        <ul>${exList(day).filter(e => s.ex?.[e.id]?.some(x => x.done)).map(e =>
-          `<li><span>${esc(e.name)}</span><span>${s.ex[e.id].filter(x => x.done).map(fmtSet).join(' · ')}</span></li>`).join('')}</ul>
+        ${s.routineName ? `<p class="muted hist-sub">${esc(s.routineName)}</p>` : ''}
+        <ul>${(s.plan || []).filter(e => s.ex?.[e.key]?.some(x => x.done)).map(e =>
+          `<li><span>${esc(e.name)}</span><span>${s.ex[e.key].filter(x => x.done).map(fmtSet).join(' · ')}</span></li>`).join('')}</ul>
         ${s.note ? `<p class="hist-note">${esc(s.note)}</p>` : ''}
         <button class="ghost danger" data-act="del-session" data-id="${esc(s.id)}">Eliminar</button>
       </details>`;
     }).join('') : '<p class="empty">Todavía no hay sesiones guardadas.</p>'}
     <div class="card">
       <h2 style="font-size:16px">Copia de seguridad</h2>
-      <p class="muted" style="font-size:14px">Los datos se guardan solo en este navegador. Exportá una copia de vez en cuando.</p>
+      <p class="muted" style="font-size:14px">Los datos (rutinas e historial) se guardan solo en este navegador. Exportá una copia de vez en cuando.</p>
       <div class="row">
         <button class="mini" data-act="export">Exportar JSON</button>
         <button class="mini" data-act="import">Importar JSON</button>
@@ -450,27 +775,47 @@ async function importData(file) {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data.sessions)) throw new Error();
     const ids = new Set(db.sessions.map(s => s.id));
-    const added = data.sessions.filter(s => s && s.id && !ids.has(s.id));
+    const added = data.sessions.filter(s => s && s.id && !ids.has(s.id)).map(upgradeSession);
     db.sessions = [...db.sessions, ...added].sort((a, b) => a.start - b.start);
+    // Rutinas: las del archivo que no estén ya (un backup de la versión 1 trae la rutina inicial).
+    const incoming = Array.isArray(data.routines) ? data.routines : data.v === 2 ? [] : [legacyRoutine()];
+    const newRoutines = incoming.filter(r => r?.id && Array.isArray(r.days) && !routineById(r.id));
+    db.routines.push(...newRoutines);
+    if (!activeRoutine() && db.routines.length) db.activeId = db.routines[0].id;
     save(); render();
-    toast(`${added.length} sesiones importadas`);
+    toast(`${added.length} sesiones y ${newRoutines.length} rutinas importadas`);
   } catch { toast('Archivo no válido'); }
 }
 
 /* ---------- Eventos ---------- */
 app.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]');
-  if (!b) return;
-  const s = db.current;
+  if (!b || b.disabled) return;
+  if (b.dataset.act.startsWith('ed-')) return void editorClick(b);
+  const s = db.current, id = b.dataset.id;
   switch (b.dataset.act) {
     case 'history': go('history'); break;
+    case 'routines': go('routines'); break;
     case 'home': go(''); break;
     case 'resume': go('session'); break;
+    case 'resume-draft': go('edit'); break;
     case 'start': startSession(b.dataset.day); break;
-    case 'wu': {
-      const k = +b.dataset.k; s.warmup[k] = !s.warmup[k];
-      b.classList.toggle('on', s.warmup[k]);
-      $('#wu-count').textContent = `${s.warmup.filter(Boolean).length}/${ROUTINE.warmup.items.length * ROUTINE.warmup.rounds}`;
+    case 'new-routine': openEditor(null); break;
+    case 'edit-routine': openEditor(routineById(id)); break;
+    case 'dup-routine': openEditor(routineById(id), true); break;
+    case 'use-routine':
+      db.activeId = id; save(); go('');
+      toast(`Usando "${routineById(id).name}"`); break;
+    case 'del-routine':
+      if (confirm(`¿Eliminar "${routineById(id).name}"? El historial de sesiones se mantiene.`)) {
+        db.routines = db.routines.filter(r => r.id !== id); save(); render();
+      }
+      break;
+    case 'phase': {
+      const kind = b.dataset.phase, k = +b.dataset.k, st = s[kind] ||= [];
+      st[k] = !st[k];
+      b.classList.toggle('on', st[k]);
+      $(`[data-count="${kind}"]`).textContent = `${st.filter(Boolean).length}/${phaseTotal(s.phases[kind])}`;
       save(); break;
     }
     case 'set': toggleSet(b); break;
@@ -486,7 +831,7 @@ app.addEventListener('click', ev => {
       break;
     case 'del-session':
       if (confirm('¿Eliminar esta sesión del historial?')) {
-        db.sessions = db.sessions.filter(x => x.id !== b.dataset.id); save(); render();
+        db.sessions = db.sessions.filter(x => x.id !== id); save(); render();
       }
       break;
     case 'export': exportData(); break;
@@ -495,7 +840,13 @@ app.addEventListener('click', ev => {
 });
 
 app.addEventListener('input', ev => {
-  const t = ev.target, s = db.current;
+  const t = ev.target;
+  if (t.dataset.p && db.draft) {
+    const [o, k] = draftRef(t.dataset.p);
+    o[k] = t.value;
+    return save();
+  }
+  const s = db.current;
   if (!s || !t.dataset.k) return;
   if (t.dataset.k === 'note') { s.note = t.value; return save(); }
   const row = t.closest('.set'), card = t.closest('.ex');
