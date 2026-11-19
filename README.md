@@ -22,7 +22,9 @@ Con el archivo abierto directamente (`file://`) la app funciona, pero sin modo o
 
 ## Rutinas
 
-Las rutinas se cargan desde la app, en **Rutinas → + Nueva rutina**: días, ejercicios (series, reps y descanso opcional), entrada en calor y elongación. Se pueden guardar varias y elegir cuál está en uso; **Duplicar** sirve para armar la siguiente a partir de la actual.
+Las rutinas se cargan desde la app, en **Rutinas → + Nueva rutina**: días, ejercicios (series, reps, peso sugerido y descanso, opcionales los dos últimos), entrada en calor y elongación (ejercicio, series y reps). Se pueden guardar varias y elegir cuál está en uso; **Duplicar** sirve para armar la siguiente a partir de la actual.
+
+Al escribir el nombre de un ejercicio, la app sugiere los que ya usaste y una lista de ejercicios comunes (`EXERCISES` y `PHASE_ITEMS` en `index.html`). El peso sugerido se precarga la primera vez que hacés el ejercicio con esa rutina; después se usa el último peso real.
 
 El historial se vincula por nombre de ejercicio (sin importar mayúsculas ni tildes): si "Sentadilla copa" aparece en una rutina nueva, muestra lo que hiciste la última vez y precarga el peso. El descanso por defecto se cambia en `REST_SECONDS`.
 
