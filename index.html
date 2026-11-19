@@ -378,6 +378,13 @@ function toggleSet(btn) {
     const r = $('[data-k=r]', row), w = $('[data-k=w]', row);
     if (!r.value.trim()) r.value = r.placeholder;
     x.r = r.value.trim(); x.w = w.value.trim();
+    // Copiar peso y reps a la serie siguiente si todavía no está hecha.
+    const next = sets[+row.dataset.i + 1], nextRow = row.nextElementSibling;
+    if (next && !next.done && nextRow?.classList.contains('set')) {
+      next.w = x.w; next.r = x.r;
+      $('[data-k=w]', nextRow).value = x.w;
+      $('[data-k=r]', nextRow).value = x.r;
+    }
     startRest();
   }
   row.classList.toggle('done', x.done);
@@ -469,7 +476,7 @@ app.addEventListener('click', ev => {
     case 'set': toggleSet(b); break;
     case 'addset': case 'rmset': {
       const card = b.closest('.ex'), sets = s.ex[card.dataset.ex];
-      if (b.dataset.act === 'addset') sets.push({ w: sets.at(-1)?.w || '', r: '', done: false });
+      if (b.dataset.act === 'addset') sets.push({ w: sets.at(-1)?.w || '', r: sets.at(-1)?.r || '', done: false });
       else if (sets.length > 1) sets.pop();
       save(); refreshCard(card); break;
     }
