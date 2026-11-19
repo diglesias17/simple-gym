@@ -90,11 +90,13 @@ const reload = async () => { await ev('location.reload()').catch(() => {}); awai
 const type = (sel, val) => ev(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); el.value = ${JSON.stringify(val)}; el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
 const click = async sel => { await ev(`document.querySelector(${JSON.stringify(sel)}).click()`); await sleep(150); };
 const go = async v => { await ev(`go(${JSON.stringify(v)})`); await sleep(250); };
+// height: alto del recorte desde arriba de la página; 'pantalla' = solo lo visible (para hojas y ventanas fijas).
 const shot = async (name, height) => {
   if (!CAPTURAS) return;
   await sleep(300);
-  const clip = height ? { clip: { x: 0, y: 0, width: 390, height, scale: 1 } } : {};
-  const r = await cmd('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, ...clip });
+  const screen = height === 'pantalla';
+  const clip = height && !screen ? { clip: { x: 0, y: 0, width: 390, height, scale: 1 } } : {};
+  const r = await cmd('Page.captureScreenshot', { format: 'png', captureBeyondViewport: !screen, ...clip });
   fs.writeFileSync(path.join(OUT, `${name}.png`), Buffer.from(r.result.data, 'base64'));
 };
 
@@ -183,7 +185,7 @@ try {
   await click('[data-act=open-picker]'); await sleep(200);
   ok(await ev(`document.querySelectorAll('.sheet .list-row').length`) === 2, 'selector: muestra los días de la rutina');
   ok(await ev(`document.querySelector('.sheet .list-row.next')?.dataset.day === db.routines[1].days[0].id`), 'selector: resalta el día que toca');
-  await shot('04-selector');
+  await shot('04-selector', 'pantalla');
   await click('.sheet [data-act=start]'); await sleep(250);
   ok(await ev('db.current.routineName === "Rutina diciembre"'), 'sesión: usa la rutina en uso');
   ok(await ev('db.current.ex["sentadilla-copa"][0].w') === '25', 'peso: la primera vez con la rutina precarga el sugerido (25), no el de otra rutina (20)');
@@ -280,6 +282,63 @@ try {
   await ev(`db.current = null; save()`); await go('settings');
   await click('[data-act=font][data-scale="1"]');
   ok(await ev('document.documentElement.style.zoom') === '', 'letra: volver a Normal');
+
+  /* ---------- 8. Selector de ejercicios por músculo ---------- */
+  const tap = sel => ev(`document.querySelector(${JSON.stringify(sel)}).dispatchEvent(new MouseEvent('click', { bubbles: true }))`).then(() => sleep(150));
+  await go('routines');
+  await click('[data-act=edit-routine]'); await sleep(150);
+  const nEx = await ev('db.draft.days[0].ex.length');
+  await click('[data-act=ed-add-ex][data-d="0"]');
+  ok(await ev(`!!document.querySelector('.sheet.xp') && document.querySelectorAll('.sheet.xp svg.body').length === 2`), 'selector: "+ ejercicio" abre la figura (frente y espalda)');
+  ok(await ev(`db.draft.days[0].ex.length`) === nEx + 1, 'selector: la fila nueva ya está agregada');
+  ok(await ev(`[...new Set([...document.querySelectorAll('.sheet.xp [data-g]')].map(p => p.dataset.g))].filter(g => MUSCLES.some(m => m.id === g)).length`) === 15,
+    'selector: los 15 grupos musculares se pueden tocar');
+  ok(await ev(`MUSCLES.every(m => m.ex.every(n => EXERCISES.includes(n))) && EXERCISES.length === new Set(EXERCISES.map(exKey)).size`), 'selector: la lista curada incluye todos los ejercicios de los grupos, sin repetir');
+  ok(await ev(`[...document.querySelectorAll('.sheet.xp .chip')].map(c => c.textContent).join(',')`) === 'Tus ejercicios,Cardio,Movilidad y elongación', 'selector: atajos para ejercicios');
+  await shot('08-selector', 'pantalla');
+  await tap('.sheet.xp path[data-g=cuadriceps]');
+  ok(await ev(`document.querySelector('#xp-title').textContent`) === 'Cuádriceps', 'selector: tocar un músculo muestra su lista');
+  ok(await ev(`[...document.querySelectorAll('[data-act=xp-pick]')].map(b => b.dataset.name).includes('Sentadilla copa')`), 'selector: la lista tiene los ejercicios del músculo');
+  ok(await ev(`document.querySelector('[data-act=xp-pick][data-name="Sentadilla copa"] .row-meta')?.textContent`) === 'Último: 27 kg × 8', 'selector: muestra lo último que hiciste');
+  await shot('09-selector-lista', 'pantalla');
+  await click('[data-act=xp-back]');
+  ok(await ev(`document.querySelectorAll('.sheet.xp path.mz.on[data-g=cuadriceps]').length`) === 2, 'selector: al volver queda resaltado el músculo visto');
+  await tap('.sheet.xp path[data-g=pecho]');
+  await click('[data-act=xp-pick][data-name="Press inclinado con mancuernas"]');
+  ok(await ev(`!document.querySelector('.sheet.xp') && db.draft.days[0].ex[${nEx}].name === 'Press inclinado con mancuernas'`), 'selector: elegir completa el nombre y cierra');
+  ok(await ev(`document.querySelector('[data-p="days.0.ex.${nEx}.name"]').value`) === 'Press inclinado con mancuernas', 'selector: el campo muestra el nombre elegido');
+  await click(`[data-act=xp-open][data-p="days.0.ex.${nEx}.name"]`);
+  await tap('.sheet.xp path[data-g=pecho]');
+  ok(await ev(`document.querySelector('.list-row.next')?.dataset.name`) === 'Press inclinado con mancuernas', 'selector: marca el ejercicio que ya tiene el campo');
+  await click('[data-act=xp-back]');
+  await click('.chip[data-g=propios]');
+  ok(await ev(`[...document.querySelectorAll('[data-act=xp-pick]')].map(b => b.dataset.name).includes('Press banca')`), 'selector: "Tus ejercicios" incluye nombres propios');
+  await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await sleep(150);
+  ok(await ev(`!document.querySelector('.sheet.xp')`), 'selector: Escape cierra');
+  await click('[data-act=ed-add-item][data-phase=warmup]');
+  ok(await ev(`document.querySelector('.sheet.xp .chip')?.dataset.g`) === 'movilidad', 'selector: en la entrada en calor, primero Movilidad y elongación');
+  await click('[data-act=xp-type]');
+  ok(await ev(`!document.querySelector('.sheet.xp') && document.activeElement?.dataset.p === 'warmup.items.' + (db.draft.warmup.items.length - 1) + '.name'`), 'selector: "Escribir el nombre" cierra y deja el cursor en el campo');
+  await click(`[data-act=xp-open][data-p="days.0.ex.0.name"]`);
+  await ev(`(() => { const p = document.querySelector('.sheet.xp path[data-g=gemelos][tabindex]'); p.focus(); p.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`); await sleep(150);
+  ok(await ev(`document.querySelector('#xp-title').textContent`) === 'Gemelos', 'selector: con teclado, Enter elige el músculo');
+  ok(await ev(`!!document.querySelector('.sheet.xp [data-act=xp-back]') && !!document.querySelector('.sheet.xp [data-act=xp-type]')`), 'selector: en la lista hay Volver y Escribir un nombre nuevo');
+  await click('[data-act=xp-close]');
+  // Con letra muy grande la hoja entra en la pantalla, y en una lista larga Volver y Cancelar siguen a la vista.
+  await ev(`db.settings.fontScale = 1.3; save(); applySettings()`);
+  await cmd('Emulation.setDeviceMetricsOverride', { width: 330, height: 640, deviceScaleFactor: 1, mobile: true }); await sleep(300);
+  await click(`[data-act=xp-open][data-p="days.0.ex.0.name"]`); await sleep(400);   // termina la animación de entrada
+  const fits = () => ev(`(() => { const r = document.querySelector('.sheet.xp').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight + 1; })()`);
+  ok(await fits(), 'selector: con letra muy grande la hoja entra en la pantalla');
+  await tap('.sheet.xp path[data-g=dorsales]');
+  await ev(`document.querySelector('.sheet.xp').scrollTo(0, 9999)`); await sleep(150);
+  ok(await fits() && await ev(`(() => { const s = document.querySelector('.sheet.xp').getBoundingClientRect(), h = document.querySelector('.xp-head').getBoundingClientRect(), f = document.querySelector('.xp-foot').getBoundingClientRect();
+    return h.top >= s.top - 1 && h.bottom < s.bottom && f.bottom <= s.bottom + 1 && f.top > s.top; })()`), 'selector: al bajar en la lista, Volver, Cancelar y Escribir siguen a la vista');
+  await shot('10-selector-letra-grande', 'pantalla');
+  await click('[data-act=xp-close]');
+  await cmd('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await ev(`db.settings.fontScale = 1; save(); applySettings()`);
+  await ev(`db.draft = null; save()`); await go('');
 
   ok(errors.length === 0, 'sin errores de JavaScript' + (errors.length ? ': ' + errors.join(' | ') : ''));
 } catch (e) {

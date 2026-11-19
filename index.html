@@ -29,6 +29,7 @@
     /* Colores de discos olímpicos: uno por día de la rutina. */
     --plate-0: #d6402f; --plate-1: #2563c9; --plate-2: #e0ad0b; --plate-3: #2f9a55;
     --radius: 16px; --tabbar-h: 64px;
+    --muscle: #b9beb6; --muscle-hover: #a1a79e;
     --display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
     --body: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     color-scheme: light;
@@ -38,6 +39,7 @@
       --bg: #121417; --surface: #1b1e22; --surface-2: #262a30; --line: #30353c;
       --text: #eef0f2; --muted: #9aa0a8; --accent: #c6f135;
       --done-bg: #1f2810; --danger: #ff6b5e;
+      --muscle: #4b525a; --muscle-hover: #5d656e;
       color-scheme: dark;
     }
   }
@@ -122,7 +124,7 @@
 
   /* Hoja para elegir el día */
   .sheet-bg { position: fixed; inset: 0; z-index: 30; background: rgba(10,12,14,.5); animation: fade .2s ease-out; }
-  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-width: 560px; margin: 0 auto; max-height: 85vh; overflow-y: auto;
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-width: 560px; margin: 0 auto; max-height: calc(85dvh / var(--zoom, 1)); overflow-y: auto;
     background: var(--bg); border-radius: 22px 22px 0 0; padding: 6px 16px calc(12px + env(safe-area-inset-bottom)); animation: up .24s ease-out; }
   .sheet::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 4px auto 6px; }
   .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -130,6 +132,37 @@
   @keyframes up { from { transform: translateY(100%); } }
   @keyframes fade { from { opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .sheet, .sheet-bg { animation: none; } }
+
+  /* Selector de ejercicios por músculo */
+  .sheet.xp { display: flex; flex-direction: column; height: calc(90dvh / var(--zoom, 1)); max-height: none; padding-bottom: 0; }
+  .sheet.xp > :not(.xp-foot) { flex: none; }
+  .sheet-head h2 { flex: 1; }
+  .xp-head { position: sticky; top: -6px; z-index: 1; background: var(--bg); margin: 0 -16px; padding: 4px 16px 8px; min-height: 52px; }
+  .xp-head h2 { font-size: 24px; }
+  .text-btn { display: inline-flex; align-items: center; gap: 2px; padding: 10px 4px; font-weight: 700; color: var(--accent); }
+  .text-btn.back { margin-left: -6px; }
+  .text-btn svg { width: 20px; height: 20px; }
+  .xp-foot { position: sticky; bottom: 0; margin: auto -16px 0; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); }
+  .xp-foot .mini { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; font-size: 15px; }
+  .xp-foot svg { width: 18px; height: 18px; }
+  .xp-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 4px 0 0; }
+  .xp-figs figure { margin: 0; text-align: center; }
+  .xp-figs figcaption { font-size: 13px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+  .body { display: block; width: 100%; height: min(calc(52dvh / var(--zoom, 1)), 460px); }
+  .body .bz { fill: var(--line); }
+  .body .mz { fill: var(--muscle); cursor: pointer; transition: fill .12s; }
+  .body .mz:hover, .body .mz:active { fill: var(--muscle-hover); }
+  .body .mz.on { fill: var(--lime); stroke: var(--iron); stroke-width: 1.2; }
+  .body .mz:focus-visible { outline: none; stroke: var(--accent); stroke-width: 2.5; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 14px 0 2px; }
+  .chip { padding: 10px 16px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); font-size: 15px; font-weight: 600; }
+  .chip:active { background: var(--surface-2); }
+  .sheet.xp .list-row { padding: 12px 14px; }
+  .sheet.xp .row-title { font-size: 20px; }
+  .xp-btn { color: var(--text); }
+  .xp-btn svg { width: 22px; height: 22px; }
+  .ed-ex.flash { animation: flash 1.4s ease-out; }
+  @keyframes flash { from { background: color-mix(in srgb, var(--lime) 40%, transparent); } }
 
   /* Botón flotante */
   .fab { position: fixed; z-index: 8; right: max(16px, calc(50% - 264px)); bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px);
@@ -343,43 +376,56 @@ const LEGACY_ROUTINE = {
 const REST_SECONDS = 90;   // descanso por defecto si no se eligió otro en Configuración
 const PHASES = [['warmup', 'Entrada en calor', 'Ej.: Ranas a 1 pierna'], ['cooldown', 'Elongación', 'Ej.: Isquios con banda']];
 
-/* ---------- Lista de ejercicios para el autocompletar ---------- */
-// Curada a mano, en español de gimnasio rioplatense. Se suma a los nombres que ya usaste (que tienen prioridad).
-const EXERCISES = [
-  // Piernas y glúteos
-  'Sentadilla con barra', 'Sentadilla frontal', 'Sentadilla copa', 'Sentadilla búlgara', 'Sentadilla Zercher', 'Sentadilla sumo',
-  'Sentadilla en Smith', 'Sentadilla hack', 'Sentadilla a cajón', 'Sentadilla con salto', 'Estocadas', 'Estocadas caminando',
-  'Estocadas hacia atrás', 'Estocada lateral', 'Subidas a cajón', 'Prensa 45°', 'Prensa horizontal', 'Sillón de cuádriceps',
-  'Camilla de isquios', 'Isquios sentado en máquina', 'Peso muerto', 'Peso muerto rumano', 'Peso muerto sumo',
-  'Peso muerto a 1 pierna', 'Peso muerto con barra hexagonal', 'Buenos días', 'Empuje de cadera', 'Empuje de cadera a 1 pierna',
-  'Puente de glúteos', 'Patada de glúteo en polea', 'Abductores en máquina', 'Aductores en máquina', 'Gemelos parado',
-  'Gemelos sentado', 'Gemelos en prensa', 'Curl nórdico', 'Swing con pesa rusa',
-  // Pecho
-  'Press plano con barra', 'Press plano con mancuernas', 'Press inclinado con barra', 'Press inclinado con mancuernas',
-  'Press declinado con barra', 'Press de pecho en máquina', 'Press plano en Smith', 'Aperturas con mancuernas',
-  'Aperturas en polea', 'Cruce de poleas', 'Pec deck', 'Flexiones de brazos', 'Flexiones con rodillas apoyadas',
-  'Fondos en paralelas', 'Pullover con mancuerna',
-  // Espalda
-  'Dominadas', 'Dominadas asistidas', 'Dominadas supinas', 'Polea al pecho', 'Polea al pecho agarre abierto',
-  'Polea al pecho agarre neutro', 'Polea al pecho agarre supino', 'Remo con barra', 'Remo con mancuerna', 'Remo en polea baja',
-  'Remo en máquina', 'Remo hammer', 'Remo en T', 'Remo invertido', 'Pullover en polea', 'Face pull', 'Encogimientos de hombros',
-  'Espinales', 'Espinales en máquina',
-  // Hombros
-  'Press militar con barra', 'Press militar con mancuernas', 'Press de hombros en máquina', 'Press Arnold', 'Vuelos laterales',
-  'Vuelos laterales en polea', 'Vuelos frontales', 'Vuelos posteriores', 'Remo al mentón', 'Rotación externa con banda',
-  'Rotación externa en polea',
-  // Brazos
-  'Curl de bíceps con barra', 'Curl de bíceps con mancuernas', 'Curl martillo', 'Curl concentrado', 'Curl en banco Scott',
-  'Curl de bíceps en polea', 'Curl con barra W', 'Curl inclinado con mancuernas', 'Press francés con barra',
-  'Press francés con mancuerna', 'Extensión de tríceps en polea', 'Extensión de tríceps con soga',
-  'Extensión de tríceps sobre la cabeza', 'Patada de tríceps', 'Fondos en banco', 'Press cerrado',
-  // Zona media
-  'Plancha', 'Plancha lateral', 'Plancha con toque de hombro', 'Abdominales', 'Abdominales bicicleta',
-  'Elevación de piernas colgado', 'Elevación de piernas acostado', 'Bicho muerto', 'Perro pájaro', 'Rueda abdominal',
-  'Press Pallof', 'Giros rusos', 'Leñador en polea', 'Posición hueca', 'Escaladores', 'Paseo del granjero',
-  // Cardio y potencia
-  'Bicicleta fija', 'Cinta', 'Remo ergómetro', 'Elíptico', 'Saltar la soga', 'Burpees', 'Salto al cajón', 'Sogas de batalla',
+/* ---------- Lista de ejercicios ---------- */
+// Curada a mano, en español de gimnasio rioplatense. Alimenta el autocompletar y el selector por músculo.
+// Ejercicios por grupo muscular, para el selector con la figura del cuerpo. Un ejercicio puede estar en varios grupos;
+// el orden es el de uso más común. `views` dice en qué figura aparece el grupo (frente y/o espalda).
+const MUSCLES = [
+  { id: 'pecho', name: 'Pecho', views: ['front'], ex: ['Press plano con barra', 'Press plano con mancuernas', 'Press inclinado con barra',
+    'Press inclinado con mancuernas', 'Press de pecho en máquina', 'Aperturas con mancuernas', 'Cruce de poleas', 'Pec deck',
+    'Aperturas en polea', 'Flexiones de brazos', 'Flexiones con rodillas apoyadas', 'Fondos en paralelas', 'Press declinado con barra',
+    'Press plano en Smith', 'Pullover con mancuerna'] },
+  { id: 'hombros', name: 'Hombros', views: ['front', 'back'], ex: ['Press militar con barra', 'Press militar con mancuernas',
+    'Press de hombros en máquina', 'Press Arnold', 'Vuelos laterales', 'Vuelos laterales en polea', 'Vuelos frontales',
+    'Vuelos posteriores', 'Face pull', 'Remo al mentón', 'Rotación externa con banda', 'Rotación externa en polea'] },
+  { id: 'biceps', name: 'Bíceps', views: ['front'], ex: ['Curl de bíceps con barra', 'Curl de bíceps con mancuernas', 'Curl martillo',
+    'Curl con barra W', 'Curl de bíceps en polea', 'Curl en banco Scott', 'Curl concentrado', 'Curl inclinado con mancuernas',
+    'Dominadas supinas', 'Polea al pecho agarre supino'] },
+  { id: 'triceps', name: 'Tríceps', views: ['back'], ex: ['Extensión de tríceps en polea', 'Extensión de tríceps con soga',
+    'Press francés con barra', 'Press francés con mancuerna', 'Extensión de tríceps sobre la cabeza', 'Patada de tríceps',
+    'Fondos en banco', 'Fondos en paralelas', 'Press cerrado'] },
+  { id: 'antebrazos', name: 'Antebrazos', views: ['front', 'back'], ex: ['Curl de muñeca', 'Curl de muñeca invertido', 'Curl martillo',
+    'Paseo del granjero', 'Colgarse de la barra'] },
+  { id: 'abdominales', name: 'Abdominales', views: ['front'], ex: ['Plancha', 'Abdominales', 'Elevación de piernas colgado',
+    'Elevación de piernas acostado', 'Bicho muerto', 'Rueda abdominal', 'Abdominales bicicleta', 'Posición hueca', 'Escaladores',
+    'Plancha con toque de hombro'] },
+  { id: 'oblicuos', name: 'Oblicuos', views: ['front', 'back'], ex: ['Plancha lateral', 'Press Pallof', 'Giros rusos', 'Leñador en polea',
+    'Abdominales bicicleta', 'Paseo del granjero'] },
+  { id: 'trapecio', name: 'Trapecio', views: ['front', 'back'], ex: ['Encogimientos de hombros', 'Face pull', 'Remo al mentón',
+    'Paseo del granjero', 'Peso muerto'] },
+  { id: 'dorsales', name: 'Espalda', views: ['back'], ex: ['Dominadas', 'Dominadas asistidas', 'Polea al pecho', 'Polea al pecho agarre abierto',
+    'Polea al pecho agarre neutro', 'Polea al pecho agarre supino', 'Remo con barra', 'Remo con mancuerna', 'Remo en polea baja',
+    'Remo en máquina', 'Remo hammer', 'Remo en T', 'Remo invertido', 'Dominadas supinas', 'Pullover en polea', 'Pullover con mancuerna'] },
+  { id: 'lumbares', name: 'Lumbares', views: ['back'], ex: ['Espinales', 'Espinales en máquina', 'Peso muerto', 'Peso muerto rumano',
+    'Buenos días', 'Perro pájaro', 'Swing con pesa rusa'] },
+  { id: 'gluteos', name: 'Glúteos', views: ['back'], ex: ['Empuje de cadera', 'Puente de glúteos', 'Empuje de cadera a 1 pierna',
+    'Patada de glúteo en polea', 'Abductores en máquina', 'Sentadilla búlgara', 'Peso muerto rumano', 'Peso muerto sumo',
+    'Sentadilla sumo', 'Estocadas hacia atrás', 'Estocadas caminando', 'Subidas a cajón', 'Peso muerto a 1 pierna',
+    'Swing con pesa rusa', 'Peso muerto con barra hexagonal'] },
+  { id: 'cuadriceps', name: 'Cuádriceps', views: ['front'], ex: ['Sentadilla con barra', 'Sentadilla copa', 'Prensa 45°',
+    'Sillón de cuádriceps', 'Sentadilla búlgara', 'Estocadas', 'Estocadas caminando', 'Sentadilla frontal', 'Sentadilla hack',
+    'Sentadilla en Smith', 'Prensa horizontal', 'Subidas a cajón', 'Sentadilla Zercher', 'Sentadilla a cajón', 'Estocadas hacia atrás',
+    'Sentadilla con salto', 'Peso muerto con barra hexagonal'] },
+  { id: 'aductores', name: 'Aductores', views: ['front'], ex: ['Aductores en máquina', 'Sentadilla sumo', 'Estocada lateral',
+    'Peso muerto sumo', 'Plancha de Copenhague'] },
+  { id: 'isquios', name: 'Isquios', views: ['back'], ex: ['Camilla de isquios', 'Isquios sentado en máquina', 'Peso muerto rumano',
+    'Peso muerto', 'Peso muerto a 1 pierna', 'Buenos días', 'Curl nórdico', 'Swing con pesa rusa'] },
+  { id: 'gemelos', name: 'Gemelos', views: ['front', 'back'], ex: ['Gemelos parado', 'Gemelos sentado', 'Gemelos en prensa', 'Saltar la soga'] },
 ];
+const CARDIO = ['Cinta', 'Bicicleta fija', 'Elíptico', 'Remo ergómetro', 'Saltar la soga', 'Burpees', 'Escaladores', 'Salto al cajón',
+  'Sogas de batalla', 'Swing con pesa rusa'];
+// Lista para el autocompletar: todos los anteriores, sin repetir.
+const EXERCISES = [...new Set([...MUSCLES.flatMap(m => m.ex), ...CARDIO])];
 const PHASE_ITEMS = [
   'Movilidad de cadera', 'Movilidad de tobillo', 'Rotación torácica', 'Círculos de brazos', 'Rotaciones de hombros',
   'Dislocaciones con bastón', 'Gato-camello', 'Estocada con rotación', 'Sentadilla profunda sostenida',
@@ -522,6 +568,7 @@ const ICON = {
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   prev: svg('<path d="M15 18l-6-6 6-6"/>'),
   next: svg('<path d="M9 18l6-6-6-6"/>'),
+  body: svg('<circle cx="12" cy="4.5" r="2"/><path d="M5 9l7 1 7-1M12 10v5M12 15l-3 6M12 15l3 6"/>'),
 };
 document.querySelectorAll('.tab').forEach(t => t.insertAdjacentHTML('afterbegin', ICON[t.dataset.icon]));
 
@@ -552,8 +599,15 @@ const fab = (act, label, icon = ICON.plus, extra = '') => `<button class="fab" d
 /* ---------- Navegación ---------- */
 const view = () => location.hash.slice(1);
 function go(v) { if (view() === v) render(); else location.hash = v; }
-addEventListener('hashchange', () => { pickerOpen = false; render(); scrollTo(0, 0); });
-addEventListener('keydown', ev => { if (ev.key === 'Escape' && pickerOpen) { pickerOpen = false; render(); } });
+addEventListener('hashchange', () => { pickerOpen = false; xp = null; render(); scrollTo(0, 0); });
+addEventListener('keydown', ev => {
+  if (ev.key === 'Escape' && pickerOpen) { pickerOpen = false; render(); }
+  if (ev.key === 'Escape' && xp) { xp = null; xpRender(); }
+  // Las zonas del cuerpo son <path> con role="button": Enter y espacio las activan como a un botón.
+  if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches?.('path[role=button]')) {
+    ev.preventDefault(); ev.target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  }
+});
 
 function render() {
   const v = view();
@@ -873,7 +927,8 @@ function renderEditor() {
     ${datalist('phase-items', knownNames(
       r => [...PHASES.flatMap(([k]) => r[k].items.map(i => i.name)), ...r.days.flatMap(day => day.ex.map(e => e.name))],
       s => [...PHASES.flatMap(([k]) => (s.phases?.[k]?.items || []).map(i => i.name)), ...(s.plan || []).map(e => e.name)],
-      [...PHASE_ITEMS, ...EXERCISES]))}`;
+      [...PHASE_ITEMS, ...EXERCISES]))}
+    <div id="xp-root">${xp ? xpSheet() : ''}</div>`;
 }
 
 // Sugerencias al escribir: primero los nombres que ya usaste (rutinas e historial, con la escritura más reciente),
@@ -890,6 +945,159 @@ function knownNames(fromRoutine, fromSession, curated = []) {
 }
 const datalist = (id, names) => `<datalist id="${id}">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>`;
 
+/* ---------- Figura del cuerpo ---------- */
+// Cada zona es un contorno suave (spline por puntos) de la mitad derecha de la figura; la izquierda se obtiene reflejando
+// en x = 100. g = grupo muscular de MUSCLES (sin g: parte neutra). c: true = pieza central, no se refleja.
+const BODY = {
+  front: [
+    { pts: [[92, 46], [108, 46], [110, 63], [90, 63]], c: true },
+    { g: 'trapecio', pts: [[106, 50], [114, 57], [129, 66], [121, 72], [106, 66]] },
+    { g: 'hombros', pts: [[122, 70], [136, 69], [147, 78], [151, 93], [148, 107], [140, 104], [131, 93], [124, 81]] },
+    { g: 'pecho', pts: [[102, 75], [118, 72], [128, 77], [133, 91], [128, 104], [114, 110], [102, 107]] },
+    { g: 'biceps', pts: [[136, 104], [146, 108], [152, 122], [152, 140], [146, 150], [138, 146], [134, 130], [133, 114]] },
+    { g: 'antebrazos', pts: [[140, 153], [150, 153], [158, 167], [162, 187], [160, 204], [152, 205], [146, 190], [140, 170]] },
+    { pts: [[150, 209], [161, 207], [166, 219], [162, 233], [153, 233], [148, 221]] },
+    { g: 'abdominales', pts: [[101, 116], [111, 115], [113, 130], [101, 131]] },
+    { g: 'abdominales', pts: [[101, 135], [113, 134], [113, 150], [101, 151]] },
+    { g: 'abdominales', pts: [[101, 155], [113, 154], [112, 171], [101, 172]] },
+    { g: 'abdominales', pts: [[101, 176], [112, 175], [109, 196], [101, 200]] },
+    { g: 'oblicuos', pts: [[117, 116], [127, 113], [131, 130], [129, 158], [123, 180], [116, 182], [116, 150]] },
+    { g: 'cuadriceps', pts: [[114, 210], [127, 200], [135, 216], [135, 250], [131, 282], [124, 298], [115, 298], [111, 275], [113, 243]] },
+    { g: 'aductores', pts: [[101, 208], [110, 205], [110, 228], [106, 250], [101, 262]] },
+    { pts: [[113, 302], [125, 302], [127, 312], [119, 318], [112, 312]] },
+    { g: 'gemelos', pts: [[110, 321], [122, 320], [130, 334], [130, 352], [124, 371], [116, 371], [110, 350]] },
+    { pts: [[114, 376], [125, 376], [131, 389], [112, 391]] },
+  ],
+  back: [
+    { g: 'trapecio', pts: [[101, 48], [110, 51], [117, 61], [133, 70], [126, 80], [118, 94], [108, 112], [101, 126]] },
+    { g: 'hombros', pts: [[124, 72], [136, 69], [147, 78], [151, 93], [148, 107], [140, 104], [131, 93], [128, 82]] },
+    { g: 'dorsales', pts: [[115, 106], [129, 88], [135, 99], [134, 118], [128, 139], [118, 155], [106, 154], [106, 126]] },
+    { g: 'triceps', pts: [[136, 104], [146, 108], [152, 122], [152, 140], [146, 150], [138, 146], [134, 130], [133, 114]] },
+    { g: 'antebrazos', pts: [[140, 153], [150, 153], [158, 167], [162, 187], [160, 204], [152, 205], [146, 190], [140, 170]] },
+    { pts: [[150, 209], [161, 207], [166, 219], [162, 233], [153, 233], [148, 221]] },
+    { g: 'lumbares', pts: [[102, 160], [110, 159], [114, 172], [113, 190], [102, 193]] },
+    { g: 'oblicuos', pts: [[121, 156], [131, 142], [132, 162], [126, 186], [118, 188], [117, 170]] },
+    { g: 'gluteos', pts: [[102, 199], [116, 193], [130, 197], [136, 215], [132, 236], [118, 242], [104, 238], [101, 220]] },
+    { g: 'isquios', pts: [[106, 246], [119, 243], [132, 241], [134, 263], [130, 290], [122, 300], [113, 300], [107, 277]] },
+    { pts: [[113, 303], [125, 303], [127, 312], [119, 318], [112, 312]] },
+    { g: 'gemelos', pts: [[108, 320], [122, 318], [132, 333], [132, 350], [124, 370], [116, 372], [108, 352], [106, 335]] },
+    { pts: [[114, 376], [125, 376], [131, 389], [112, 391]] },
+  ],
+};
+
+// Contorno cerrado y suave que pasa por los puntos (Catmull-Rom → curvas de Bézier).
+function blob(pts) {
+  const n = pts.length, p = i => pts[(i + n) % n], f = v => Math.round(v * 10) / 10;
+  let d = `M${p(0).map(f)}`;
+  for (let i = 0; i < n; i++) {
+    const [a, b, c, e] = [p(i - 1), p(i), p(i + 1), p(i + 2)];
+    d += `C${f(b[0] + (c[0] - a[0]) / 6)},${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)},${f(c[1] - (e[1] - b[1]) / 6)} ${c.map(f)}`;
+  }
+  return d + 'Z';
+}
+
+// Una figura (frente o espalda). Las zonas musculares son botones; `sel` es el grupo resaltado.
+function bodySvg(view, sel) {
+  const label = g => MUSCLES.find(m => m.id === g).name;
+  const seen = new Set();   // un solo botón por grupo para el teclado y los lectores de pantalla
+  const shape = (z, pts, main) => z.g
+    ? `<path d="${blob(pts)}" class="mz${z.g === sel ? ' on' : ''}" data-act="xp-group" data-g="${z.g}"${main ? ` role="button" tabindex="0" aria-label="${label(z.g)}"` : ''}/>`
+    : `<path d="${blob(pts)}" class="bz"/>`;
+  return `<svg viewBox="30 4 140 392" class="body" role="group" aria-label="${view === 'front' ? 'Frente' : 'Espalda'}">
+    <ellipse cx="100" cy="27" rx="15" ry="19" class="bz"/>
+    ${view === 'back' ? `<path d="${blob([[92, 46], [108, 46], [110, 60], [90, 60]])}" class="bz"/>` : ''}
+    ${BODY[view].map(z => {
+      const main = z.g && !seen.has(z.g);
+      if (z.g) seen.add(z.g);
+      return shape(z, z.pts, main) + (z.c ? '' : shape(z, z.pts.map(([x, y]) => [200 - x, y]), false));
+    }).join('')}
+  </svg>`;
+}
+
+/* ---------- Selector de ejercicios con la figura del cuerpo ---------- */
+let xp = null;   // abierto: { p: ruta del campo en el borrador, g: grupo elegido, last: último grupo visto }
+
+const xpPhase = p => !p.startsWith('days.');
+// Nombres que ya usaste: de las fases solo si el campo es de entrada en calor o elongación.
+const ownNames = phase => knownNames(
+  r => [...(phase ? PHASES.flatMap(([k]) => r[k].items.map(i => i.name)) : []), ...r.days.flatMap(d => d.ex.map(e => e.name))],
+  s => [...(phase ? PHASES.flatMap(([k]) => (s.phases?.[k]?.items || []).map(i => i.name)) : []), ...(s.plan || []).map(e => e.name)]);
+const XP_EXTRA = {
+  propios: ['Tus ejercicios', phase => ownNames(phase)],
+  cardio: ['Cardio', () => CARDIO],
+  movilidad: ['Movilidad y elongación', () => PHASE_ITEMS],
+};
+function xpGroup(g, phase) {
+  const m = MUSCLES.find(m => m.id === g);
+  return m ? { name: m.name, ex: m.ex } : { name: XP_EXTRA[g][0], ex: XP_EXTRA[g][1](phase) };
+}
+const lastText = name => {
+  const l = lastSets(exKey(name)), s = l?.sets.at(-1);
+  return s ? `Último: ${s.w ? `${s.w} kg × ${s.r || '–'}` : `${s.r} reps`}` : '';
+};
+
+function xpSheet() {
+  const phase = xpPhase(xp.p), [o, k] = draftRef(xp.p), cur = exKey(o[k] || '');
+  const grp = xp.g && xpGroup(xp.g, phase);
+  const extras = (phase ? ['movilidad', 'propios', 'cardio'] : ['propios', 'cardio', 'movilidad'])
+    .filter(g => g !== 'propios' || ownNames(phase).length);
+  return `
+    <div class="sheet-bg" data-act="xp-close"></div>
+    <section class="sheet xp" role="dialog" aria-modal="true" aria-labelledby="xp-title">
+      <div class="sheet-head xp-head">
+        ${grp ? `<button class="text-btn back" data-act="xp-back">${ICON.prev}Volver</button>` : ''}
+        <h2 id="xp-title">${grp ? esc(grp.name) : 'Elegí el músculo'}</h2>
+        <button class="text-btn" data-act="xp-close">Cancelar</button>
+      </div>
+      ${grp ? `
+      <div class="card list">
+        ${grp.ex.length ? grp.ex.map(n => {
+          const meta = lastText(n), on = exKey(n) === cur;
+          return `
+          <button class="list-row ${on ? 'next' : ''}" data-act="xp-pick" data-name="${esc(n)}">
+            <span class="row-main"><span class="row-title">${esc(n)}${on ? '<span class="tag">Elegido</span>' : ''}</span>
+              ${meta ? `<span class="row-meta">${esc(meta)}</span>` : ''}</span>
+          </button>`;
+        }).join('') : '<p class="muted hint">Todavía no hay ejercicios acá.</p>'}
+      </div>` : `
+      <div class="xp-figs">
+        <figure>${bodySvg('front', xp.last)}<figcaption>Frente</figcaption></figure>
+        <figure>${bodySvg('back', xp.last)}<figcaption>Espalda</figcaption></figure>
+      </div>
+      <div class="chips">${extras.map(g => `<button class="chip" data-act="xp-group" data-g="${g}">${XP_EXTRA[g][0]}</button>`).join('')}</div>`}
+      <div class="xp-foot">
+        <button class="mini block" data-act="xp-type">${ICON.plus}Escribir un nombre nuevo</button>
+      </div>
+    </section>`;
+}
+const xpRender = () => { const el = $('#xp-root'); if (el) el.innerHTML = xp ? xpSheet() : ''; };
+
+function openPicker(p) { xp = { p, g: null, last: null }; xpRender(); }
+
+function xpClick(b) {
+  switch (b.dataset.act) {
+    case 'xp-open': return openPicker(b.dataset.p);
+    case 'xp-group': xp.g = xp.last = b.dataset.g; break;
+    case 'xp-back': xp.g = null; break;
+    case 'xp-close': xp = null; break;
+    case 'xp-type': {
+      const p = xp.p; xp = null; xpRender();
+      return $(`[data-p="${p}"]`, app)?.focus();
+    }
+    case 'xp-pick': {
+      const [o, k] = draftRef(xp.p), p = xp.p;
+      o[k] = b.dataset.name; xp = null; save(); renderEditor();
+      const row = $(`[data-p="${p}"]`, app)?.closest('.ed-ex');
+      if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('flash'); }
+      return;
+    }
+  }
+  xpRender();
+  $('.sheet.xp')?.scrollTo(0, 0);
+}
+
+const pickBtn = p => `<button class="icon-btn xp-btn" data-act="xp-open" data-p="${p}" aria-label="Elegir por músculo">${ICON.body}</button>`;
+
 function phaseEditor(kind, title, ph) {
   const p = db.draft[kind];
   return `
@@ -901,7 +1109,8 @@ function phaseEditor(kind, title, ph) {
         return `
         <div class="ed-ex">
           <div class="ed-row"><span class="n">${i + 1}</span>
-            <input class="inp" list="phase-items" data-p="${path}.name" value="${esc(it.name)}" placeholder="${esc(ph)}" autocomplete="off"></div>
+            <input class="inp" list="phase-items" data-p="${path}.name" value="${esc(it.name)}" placeholder="${esc(ph)}" autocomplete="off">
+            ${pickBtn(`${path}.name`)}</div>
           <div class="ed-grid">
             <label class="lbl">Series<input class="inp" data-p="${path}.sets" value="${esc(it.sets)}" inputmode="numeric" autocomplete="off"></label>
             <label class="lbl">Reps<input class="inp" data-p="${path}.reps" value="${esc(it.reps)}" placeholder="10" autocomplete="off"></label>
@@ -929,7 +1138,8 @@ function dayEditor(day, di) {
         return `
         <div class="ed-ex">
           <div class="ed-row"><span class="n">${ei + 1}</span>
-            <input class="inp" list="ex-names" data-p="${p}.name" value="${esc(e.name)}" placeholder="Ejercicio" autocomplete="off"></div>
+            <input class="inp" list="ex-names" data-p="${p}.name" value="${esc(e.name)}" placeholder="Ejercicio" autocomplete="off">
+            ${pickBtn(`${p}.name`)}</div>
           <div class="ed-grid">
             <label class="lbl">Series<input class="inp" data-p="${p}.sets" value="${esc(e.sets)}" inputmode="numeric" autocomplete="off"></label>
             <label class="lbl">Reps<input class="inp" data-p="${p}.reps" value="${esc(e.reps)}" placeholder="8–10" autocomplete="off"></label>
@@ -958,6 +1168,13 @@ function editAndFocus(selector) {
   save(); renderEditor();
   const el = $(selector, app);
   if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); }
+}
+
+// Fila nueva: se muestra y se abre el selector; "Escribir el nombre" pasa al teclado.
+function addAndPick(p) {
+  xp = { p, g: null, last: null };
+  save(); renderEditor();
+  $(`[data-p="${p}"]`, app)?.scrollIntoView({ block: 'center' });
 }
 
 function saveDraft() {
@@ -1004,12 +1221,12 @@ function editorClick(b) {
     case 'ed-add-ex': {
       const di = +b.dataset.d, ex = d.days[di].ex;
       ex.push(newEx());
-      return editAndFocus(`[data-p="days.${di}.ex.${ex.length - 1}.name"]`), true;
+      return addAndPick(`days.${di}.ex.${ex.length - 1}.name`), true;
     }
     case 'ed-add-item': {
       const kind = b.dataset.phase, items = d[kind].items;
       items.push({ name: '', sets: items.at(-1)?.sets || '1', reps: '' });
-      return editAndFocus(`[data-p="${kind}.items.${items.length - 1}.name"]`), true;
+      return addAndPick(`${kind}.items.${items.length - 1}.name`), true;
     }
     case 'ed-del': {
       const [arr, i] = draftRef(b.dataset.p);
@@ -1065,6 +1282,8 @@ const REST_OPTIONS = [60, 90, 120, 180];
 function applySettings() {
   const z = db.settings?.fontScale || 1;
   document.documentElement.style.zoom = z === 1 ? '' : z;
+  // El zoom también agranda las medidas en vh: las hojas las dividen por --zoom para no salirse de la pantalla.
+  document.documentElement.style.setProperty('--zoom', z);
 }
 
 function renderSettings() {
@@ -1135,6 +1354,7 @@ async function importData(file) {
 app.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]');
   if (!b || b.disabled) return;
+  if (b.dataset.act.startsWith('xp-')) return void xpClick(b);
   if (b.dataset.act.startsWith('ed-')) return void editorClick(b);
   const s = db.current, id = b.dataset.id;
   switch (b.dataset.act) {
