@@ -247,9 +247,18 @@
   .rt-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .rt-name { font: 700 24px/1.1 var(--display); }
   .rt .row { margin-top: 12px; }
+  .rt-actions { align-items: center; }
+  .rt-actions .icon-btn { display: grid; place-items: center; width: 44px; height: 44px; color: var(--text); }
+  .rt-actions .icon-btn.danger { color: var(--danger); margin-left: auto; }
+  .rt-actions svg { width: 20px; height: 20px; }
+  .rt-actions .use { display: flex; align-items: center; gap: 6px; height: 44px; background: var(--lime); color: var(--lime-ink); }
   .rt .row-sub { margin-top: 2px; }
   .empty-card h2 { font: 700 24px var(--display); }
   .empty-card p { font-size: 15px; }
+  .menu-ic { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--surface-2); }
+  .menu-ic svg { width: 20px; height: 20px; }
+  .tag.soft { background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+  .ex-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
   /* Configuración */
   .set-title { font: 700 22px var(--display); }
@@ -283,6 +292,25 @@
   .ed-tools { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
   .icon-btn { flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--surface-2); font-weight: 700; color: var(--muted); }
   .hint { font-size: 13px; margin: 0 0 8px; }
+  .day-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 10px; padding: 2px 16px; scrollbar-width: none; }
+  .day-tabs::-webkit-scrollbar { display: none; }
+  .day-tab { flex: none; display: flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 99px; background: var(--surface);
+    border: 1px solid var(--line); font-weight: 600; font-size: 15px; white-space: nowrap; }
+  .day-tab.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .day-tab.add { color: var(--muted); border-style: dashed; }
+  .plate.xs { width: 14px; height: 14px; }
+  .plate.xs::after { display: none; }
+  .ed-day[hidden] { display: none; }
+  details.ed-ex > .ed-sum { justify-content: flex-start; font-weight: 400; padding: 2px 0; }
+  details.ed-ex > .ed-sum > .n { flex: none; width: 22px; }
+  .ed-sum-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ed-sum-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ed-sum-meta { font-size: 13px; color: var(--muted); }
+  .ed-sum-meta:empty { display: none; }
+  details.ed-ex[open] > .ed-sum { margin-bottom: 10px; }
+  .ed-sub { font: 700 17px var(--display); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 4px; }
+  .ed-phase { margin: 4px 0 6px; }
+  .ed-phase.empty { margin: 10px 0 2px; }
 
   /* Descanso */
   .rest { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--iron); color: var(--on-iron);
@@ -322,57 +350,89 @@
   <button class="tab" data-tab="settings" data-icon="settings"><span>Configuración</span></button>
 </div></nav>
 <div id="toast" class="toast" hidden></div>
+<input type="file" id="routine-file" accept="application/json,.json" hidden>
 
 <script>
-/* ---------- Rutina original (solo para migrar los datos de la versión anterior) ---------- */
-const LEGACY_ROUTINE = {
-  note: 'Las repeticiones son iniciales: pueden cambiar según suba la carga. Mantener y priorizar la técnica siempre.',
-  warmup: {
-    rounds: 2,
-    items: [
-      '10 × Cadera frontal + isquios',
-      '10 × Ranas a 1 pierna',
-      '30" Piramidal parado, pierna en cajón',
-      '10 × Flexión de cadera con bastón',
-    ],
-  },
-  // [id viejo, nombre, series, reps objetivo]
-  days: [
-    { id: 'd1', name: 'Día 1', ex: [
-      ['sentadilla-copa', 'Sentadilla copa', 4, '8–10'],
-      ['subidas-cajon', 'Subidas a cajón', 3, '8'],
-      ['press-inclinado-barra', 'Press inclinado barra', 4, '10–8'],
-      ['polea-alta-abierto', 'Polea alta abierto', 4, '12'],
-      ['curl-biceps-manc', 'Curl bíceps mancuerna', 3, '10'],
-      ['plancha-toco-hombro', 'Plancha alta toco hombro', 3, '5 c/lado'],
-      ['plancha-lateral-remo', 'Plancha lateral alta + remo', 3, '8 c/lado'],
-    ]},
-    { id: 'd2', name: 'Día 2', ex: [
-      ['peso-muerto-rumano', 'Peso muerto rumano (barra o manc.)', 4, '8'],
-      ['empuje-cadera-swiss', 'Empuje de cadera swiss ball', 3, '6–8'],
-      ['flexiones-camilla', 'Flexiones camilla (isquios)', 3, '10–12'],
-      ['press-hombros-manc', 'Press hombros manc. sentado', 3, '8'],
-      ['remo-hammer-neutro', 'Remo hammer neutro', 3, '10–12'],
-      ['vuelos-laterales', 'Vuelos laterales', 3, '10'],
-    ]},
-    { id: 'd3', name: 'Día 3', ex: [
-      ['prensa-neutro', 'Prensa neutro', 4, '10–12'],
-      ['empuje-cadera-1-pierna', 'Empuje de cadera a 1 pierna', 3, '6–8'],
-      ['press-plano-barra', 'Press plano barra', 3, '8–10'],
-      ['curl-biceps-barra', 'Curl bíceps barra', 3, '10'],
-      ['frances-manc', 'Francés mancuerna', 3, '10'],
-    ]},
-    { id: 'd4', name: 'Día 4', ex: [
-      ['sentadilla-zercher', 'Sentadilla Zercher', 4, '6'],
-      ['extension-sillon', 'Extensión sillón', 3, '12'],
-      ['polea-alta-neutro', 'Polea alta neutro', 4, '10–12'],
-      ['press-militar-maquina', 'Press militar máquina', 3, '10'],
-      ['extension-barra-polea', 'Extensión barra polea', 3, '12'],
-      ['espinales-maquina', 'Espinales máquina', 3, '8–10'],
-      ['bicho-muerto-pies', 'Bicho muerto solo pies', 3, '5 c/lado'],
-    ]},
-  ],
-};
+/* ---------- Rutinas de ejemplo ---------- */
+// Esquemas clásicos y muy usados, para arrancar sin cargar todo a mano. Se copian a una rutina propia que se edita libremente.
+// Los nombres salen de la lista curada (MUSCLES) para que se vinculen con el historial y el selector por músculo.
+// Día: [nombre, ejercicios, entrada en calor, elongación]; sin las dos últimas, usa las de la plantilla.
+// Ejercicio: [nombre, series, reps, descanso en segundos]. Ítem de fase: [nombre, series, reps].
+const WARMUP_TORSO = [['Remo ergómetro', 1, '5 min'], ['Rotación torácica', 1, '8 c/lado'], ['Dislocaciones con bastón', 1, '10'],
+  ['Face pull con banda', 1, '15'], ['Círculos de brazos', 1, '10']];
+const WARMUP_PIERNAS = [['Bicicleta fija', 1, '5 min'], ['Movilidad de cadera', 1, '10'], ['Movilidad de tobillo', 1, '10 c/lado'],
+  ['Puente de glúteos', 1, '15'], ['Sentadilla profunda sostenida', 1, '30"']];
+const COOLDOWN_TORSO = [['Elongación de pecho', 1, '30"'], ['Elongación de dorsales', 1, '30"'], ['Elongación de hombros', 1, '30"'], ['Elongación de tríceps', 1, '30"']];
+const COOLDOWN_PIERNAS = [['Elongación de cuádriceps', 1, '30"'], ['Elongación de isquios', 1, '30"'], ['Elongación de glúteo', 1, '30"'], ['Elongación de gemelos', 1, '30"']];
+const WARMUP_GYM = [['Bicicleta fija', 1, '5 min'], ['Movilidad de cadera', 1, '10'], ['Rotación torácica', 1, '8 c/lado'], ['Círculos de brazos', 1, '10']];
+const COOLDOWN_GYM = [['Elongación de cuádriceps', 1, '30"'], ['Elongación de isquios', 1, '30"'], ['Elongación de pecho', 1, '30"'], ['Elongación de dorsales', 1, '30"']];
+const TEMPLATES = [
+  { name: 'Cuerpo completo', level: 'Principiante', freq: '3 veces por semana',
+    desc: 'Todo el cuerpo en cada sesión, alternando dos días. La forma más común de empezar.',
+    note: 'Alterná A y B, 3 veces por semana (A-B-A, B-A-B). Cuando completes todas las series con buena técnica, subí un poco el peso.',
+    warmup: WARMUP_GYM, cooldown: COOLDOWN_GYM,
+    days: [
+      ['Día A', [['Sentadilla con barra', 3, '8–10', 120], ['Press plano con barra', 3, '8–10', 120], ['Remo con mancuerna', 3, '10–12', 90],
+        ['Peso muerto rumano', 3, '10', 120], ['Vuelos laterales', 2, '12–15', 60], ['Plancha', 3, '30"', 60]]],
+      ['Día B', [['Prensa 45°', 3, '10–12', 120], ['Polea al pecho', 3, '10–12', 90], ['Press militar con mancuernas', 3, '8–10', 90],
+        ['Empuje de cadera', 3, '10', 90], ['Curl de bíceps con mancuernas', 2, '12', 60], ['Extensión de tríceps en polea', 2, '12', 60]]],
+    ] },
+  { name: 'Fuerza 5×5', level: 'Principiante', freq: '3 veces por semana',
+    desc: 'Pocos ejercicios básicos con barra: 5 series de 5 y subir de peso seguido.',
+    note: 'Alterná A y B, 3 veces por semana con un día de descanso entre medio. Si completás las 5×5, la próxima subí 2,5 kg (5 kg en peso muerto).',
+    warmup: [['Bicicleta fija', 1, '5 min'], ['Movilidad de cadera', 1, '10'], ['Dislocaciones con bastón', 1, '10'], ['Sentadilla profunda sostenida', 1, '30"']],
+    cooldown: [],
+    days: [
+      ['Día A', [['Sentadilla con barra', 5, '5', 180], ['Press plano con barra', 5, '5', 180], ['Remo con barra', 5, '5', 180]]],
+      ['Día B', [['Sentadilla con barra', 5, '5', 180], ['Press militar con barra', 5, '5', 180], ['Peso muerto', 1, '5', 180]]],
+    ] },
+  { name: 'Torso / Piernas', level: 'Intermedio', freq: '4 veces por semana',
+    desc: 'Cada músculo dos veces por semana: un día de torso, uno de piernas, y se repite.',
+    note: 'Ejemplo de semana: lunes Torso 1, martes Piernas 1, jueves Torso 2, viernes Piernas 2. En los básicos buscá subir peso; en el resto, sumar repeticiones.',
+    days: [
+      ['Torso 1', [['Press plano con barra', 4, '6–8', 150], ['Remo con barra', 4, '6–8', 150], ['Press militar con mancuernas', 3, '8–10', 90],
+        ['Polea al pecho', 3, '10–12', 90], ['Curl de bíceps con barra', 2, '10–12', 60], ['Extensión de tríceps en polea', 2, '10–12', 60]], WARMUP_TORSO, COOLDOWN_TORSO],
+      ['Piernas 1', [['Sentadilla con barra', 4, '6–8', 180], ['Peso muerto rumano', 3, '8–10', 120], ['Prensa 45°', 3, '10–12', 120],
+        ['Camilla de isquios', 3, '10–12', 60], ['Gemelos parado', 4, '10–15', 60], ['Plancha', 3, '45"', 60]], WARMUP_PIERNAS, COOLDOWN_PIERNAS],
+      ['Torso 2', [['Press inclinado con mancuernas', 4, '8–10', 120], ['Remo en polea baja', 4, '10–12', 90], ['Dominadas asistidas', 3, '6–10', 120],
+        ['Vuelos laterales', 3, '12–15', 60], ['Face pull', 3, '15', 60], ['Curl martillo', 2, '12', 60], ['Extensión de tríceps sobre la cabeza', 2, '12', 60]], WARMUP_TORSO, COOLDOWN_TORSO],
+      ['Piernas 2', [['Peso muerto', 3, '5', 180], ['Sentadilla búlgara', 3, '8–10 c/pierna', 90], ['Sillón de cuádriceps', 3, '12–15', 60],
+        ['Empuje de cadera', 3, '10–12', 90], ['Gemelos sentado', 3, '12–15', 60], ['Elevación de piernas colgado', 3, '10–12', 60]], WARMUP_PIERNAS, COOLDOWN_PIERNAS],
+    ] },
+  { name: 'Empuje / Tirón / Piernas', level: 'Intermedio', freq: '3 o 6 veces por semana',
+    desc: 'Pecho, hombros y tríceps un día; espalda y bíceps otro; piernas el tercero.',
+    note: 'Con 3 días por semana hacés cada día una vez; con 6, repetís el ciclo dos veces. En los básicos buscá subir peso; en el resto, sumar repeticiones.',
+    days: [
+      ['Empuje', [['Press plano con barra', 4, '6–8', 150], ['Press inclinado con mancuernas', 3, '8–10', 120], ['Press militar con mancuernas', 3, '8–10', 90],
+        ['Vuelos laterales', 3, '12–15', 60], ['Extensión de tríceps con soga', 3, '10–12', 60], ['Fondos en paralelas', 2, '8–12', 90]], WARMUP_TORSO, COOLDOWN_TORSO],
+      ['Tirón', [['Dominadas asistidas', 4, '6–10', 120], ['Remo con barra', 4, '8–10', 120], ['Remo en polea baja', 3, '10–12', 90],
+        ['Face pull', 3, '15', 60], ['Curl de bíceps con barra', 3, '10–12', 60], ['Curl martillo', 2, '12', 60]], WARMUP_TORSO, COOLDOWN_TORSO],
+      ['Piernas', [['Sentadilla con barra', 4, '6–8', 180], ['Peso muerto rumano', 3, '8–10', 120], ['Prensa 45°', 3, '10–12', 120],
+        ['Camilla de isquios', 3, '10–12', 60], ['Gemelos parado', 4, '10–15', 60], ['Elevación de piernas colgado', 3, '10–15', 60]], WARMUP_PIERNAS, COOLDOWN_PIERNAS],
+    ] },
+  { name: 'Con mancuernas', level: 'Principiante', freq: '3 veces por semana',
+    desc: 'Cuerpo completo con un par de mancuernas y un banco. Sirve para entrenar en casa.',
+    note: 'Hacé los 3 días en la semana con un día de descanso entre medio. Cuando llegues al máximo de repeticiones en todas las series, usá mancuernas más pesadas.',
+    warmup: [['Saltar la soga', 1, '3 min'], ['Movilidad de cadera', 1, '10'], ['Rotación torácica', 1, '8 c/lado'], ['Puente de glúteos', 1, '15']],
+    cooldown: [['Elongación de cuádriceps', 1, '30"'], ['Elongación de isquios', 1, '30"'], ['Elongación de pecho', 1, '30"'], ['Postura del niño', 1, '30"']],
+    days: [
+      ['Día 1', [['Sentadilla copa', 3, '10–12', 90], ['Press plano con mancuernas', 3, '10–12', 90], ['Remo con mancuerna', 3, '10–12 c/brazo', 60],
+        ['Peso muerto rumano', 3, '10–12', 90], ['Press militar con mancuernas', 3, '10', 60], ['Plancha', 3, '30–45"', 60]]],
+      ['Día 2', [['Estocadas hacia atrás', 3, '10 c/pierna', 90], ['Flexiones de brazos', 3, '8–15', 60], ['Pullover con mancuerna', 3, '12', 60],
+        ['Puente de glúteos', 3, '15', 60], ['Curl de bíceps con mancuernas', 3, '12', 60], ['Patada de tríceps', 3, '12', 60], ['Bicho muerto', 3, '8 c/lado', 45]]],
+      ['Día 3', [['Sentadilla búlgara', 3, '8–10 c/pierna', 90], ['Press Arnold', 3, '10', 60], ['Remo con mancuerna', 3, '10–12 c/brazo', 60],
+        ['Peso muerto a 1 pierna', 3, '10 c/pierna', 60], ['Vuelos laterales', 3, '15', 45], ['Plancha lateral', 3, '30" c/lado', 45]]],
+    ] },
+];
+// Plantilla → borrador de rutina, con ids nuevos.
+const tplPhase = items => ({ items: items.map(([name, sets, reps]) => ({ name, sets, reps })) });
+const fromTemplate = t => ({
+  name: t.name, note: t.note,
+  days: t.days.map(([name, ex, warmup = t.warmup, cooldown = t.cooldown]) => ({
+    id: uid(), name, warmup: tplPhase(warmup), cooldown: tplPhase(cooldown),
+    ex: ex.map(([name, sets, reps, rest]) => ({ name, sets, reps, weight: '', rest })),
+  })),
+});
 const REST_SECONDS = 90;   // descanso por defecto si no se eligió otro en Configuración
 const PHASES = [['warmup', 'Entrada en calor', 'Ej.: Ranas a 1 pierna'], ['cooldown', 'Elongación', 'Ej.: Isquios con banda']];
 
@@ -486,51 +546,27 @@ try {
   const raw = localStorage.getItem(KEY);
   if (raw) stored = JSON.parse(raw);
 } catch {}
-if (stored) db = Object.assign(db, stored);
+// Solo datos del formato actual (v2); los de la primera versión ya no se migran.
+if (stored?.v === 2) db = Object.assign(db, stored);
 function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} }
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 
-function legacyRoutine() {
-  const L = LEGACY_ROUTINE;
-  return {
-    id: 'r1', name: 'Rutina inicial', note: L.note, created: Date.now(),
-    warmup: { rounds: L.warmup.rounds, items: [...L.warmup.items] }, cooldown: emptyPhase(),
-    days: L.days.map(d => ({ id: d.id, name: d.name, ex: d.ex.map(([, name, sets, reps]) => ({ name, sets, reps, rest: null })) })),
-  };
+// Antes la entrada en calor y la elongación eran de la rutina (iguales todos los días): pasan a cada día.
+// Sirve para los datos guardados, los borradores y los archivos importados. Si ya está convertida, no hace nada.
+function phasesToDays(r) {
+  if (!r || !PHASES.some(([k]) => k in r)) return r;
+  for (const day of r.days || []) for (const [k] of PHASES) day[k] ||= structuredClone(r[k] || emptyPhase());
+  for (const [k] of PHASES) delete r[k];
+  return r;
 }
-const LEGACY_NAMES = Object.fromEntries(LEGACY_ROUTINE.days.flatMap(d => d.ex.map(([id, name]) => [id, name])));
-
-// Convierte una sesión de la versión 1 (ejercicios con id fijo) al formato actual.
-function upgradeSession(s) {
-  if (!s || s.plan) return s;
-  const day = legacyRoutine().days.find(d => d.id === s.dayId);
-  const ex = {};
-  for (const [id, sets] of Object.entries(s.ex || {})) ex[LEGACY_NAMES[id] ? exKey(LEGACY_NAMES[id]) : id] = sets;
-  return {
-    ...s, ex, routineId: 'r1', routineName: 'Rutina inicial', dayName: day?.name || '?',
-    plan: day ? makePlan(day) : [],
-    phases: { warmup: { rounds: LEGACY_ROUTINE.warmup.rounds, items: [...LEGACY_ROUTINE.warmup.items] }, cooldown: emptyPhase() },
-    warmup: s.warmup || [], cooldown: [],
-  };
-}
-
-if (stored && stored.v !== 2) {
-  db.routines = [legacyRoutine()];
-  db.activeId = 'r1';
-  db.sessions = (db.sessions || []).map(upgradeSession);
-  db.current = upgradeSession(db.current);
-  db.v = 2;
-  save();
-}
-
 // Pasa los ítems de texto libre al formato { name, reps } en todos lados. No hace nada si ya están convertidos.
 function normalizePhases() {
   const fix = o => { if (o) for (const [k] of PHASES) if (o[k]) o[k] = normPhase(o[k]); };
-  db.routines.forEach(fix);
-  fix(db.draft);
+  [...db.routines, db.draft].forEach(r => { fix(r); r?.days?.forEach(fix); phasesToDays(r); });
   [db.current, ...db.sessions].forEach(s => fix(s?.phases));
 }
-if (/"items":\["|"rounds":/.test(JSON.stringify(db))) { normalizePhases(); save(); }
+if ([...db.routines, db.draft].some(r => r && PHASES.some(([k]) => k in r))
+  || /"items":\["|"rounds":/.test(JSON.stringify(db))) { normalizePhases(); save(); }
 
 const restDefault = () => db.settings?.restSeconds || REST_SECONDS;
 const routineById = id => db.routines.find(r => r.id === id);
@@ -569,6 +605,12 @@ const ICON = {
   prev: svg('<path d="M15 18l-6-6 6-6"/>'),
   next: svg('<path d="M9 18l6-6-6-6"/>'),
   body: svg('<circle cx="12" cy="4.5" r="2"/><path d="M5 9l7 1 7-1M12 10v5M12 15l-3 6M12 15l3 6"/>'),
+  pencil: svg('<path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/>'),
+  copy: svg('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>'),
+  check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  download: svg('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'),
+  trash: svg('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>'),
+  file: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/>'),
 };
 document.querySelectorAll('.tab').forEach(t => t.insertAdjacentHTML('afterbegin', ICON[t.dataset.icon]));
 
@@ -599,9 +641,9 @@ const fab = (act, label, icon = ICON.plus, extra = '') => `<button class="fab" d
 /* ---------- Navegación ---------- */
 const view = () => location.hash.slice(1);
 function go(v) { if (view() === v) render(); else location.hash = v; }
-addEventListener('hashchange', () => { pickerOpen = false; xp = null; render(); scrollTo(0, 0); });
+addEventListener('hashchange', () => { pickerOpen = false; sheet = null; xp = null; render(); scrollTo(0, 0); });
 addEventListener('keydown', ev => {
-  if (ev.key === 'Escape' && pickerOpen) { pickerOpen = false; render(); }
+  if (ev.key === 'Escape' && (pickerOpen || sheet)) { pickerOpen = false; sheet = null; render(); }
   if (ev.key === 'Escape' && xp) { xp = null; xpRender(); }
   // Las zonas del cuerpo son <path> con role="button": Enter y espacio las activan como a un botón.
   if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches?.('path[role=button]')) {
@@ -625,6 +667,8 @@ function render() {
 
 /* ---------- Inicio ---------- */
 let pickerOpen = false;
+let sheet = null;   // hoja abierta para crear rutinas: 'new' (menú) o 'examples' (rutinas de ejemplo)
+const newSheets = () => sheet === 'new' ? newMenu() : sheet === 'examples' ? examplesSheet() : '';
 
 // "Hoy", "Ayer" o "Hace N días", contando días de calendario.
 function relDay(t) {
@@ -699,12 +743,60 @@ function renderHome() {
         ${r.note ? `<p class="note">${esc(r.note)}</p>` : ''}` : `
         <div class="card empty-card">
           <h2>Todavía no hay rutinas</h2>
-          <p class="muted">Cargá la rutina que te dieron: días, ejercicios, series y repeticiones.</p>
-          <button class="primary" data-act="new-routine">Crear rutina</button>
+          <p class="muted">Cargá la rutina que te dieron (días, ejercicios, series y repeticiones) o arrancá con una de ejemplo.</p>
+          <button class="primary" data-act="new-menu">Crear rutina</button>
         </div>`}
     </div>
     ${r && !cur ? fab('open-picker', 'Entrenar', ICON.train) : ''}
-    ${pickerOpen ? dayPicker(r) : ''}`;
+    ${pickerOpen ? dayPicker(r) : ''}
+    ${newSheets()}`;
+}
+
+// Menú del botón "Nueva rutina": desde cero, a partir de un ejemplo o importando un archivo.
+function newMenu() {
+  const opt = (act, icon, title, sub) => `
+    <button class="list-row" data-act="${act}">
+      <span class="menu-ic">${icon}</span>
+      <span class="row-main"><span class="row-title">${title}</span><span class="row-sub">${sub}</span></span>
+      <span class="chev">${ICON.next}</span>
+    </button>`;
+  return `
+    <div class="sheet-bg" data-act="close-sheet"></div>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="sheet-head">
+        <h2 id="sheet-title">Nueva rutina</h2>
+        <button class="icon-btn" data-act="close-sheet" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="card list">
+        ${opt('new-routine', ICON.pencil, 'Desde cero', 'Cargás los días y los ejercicios a mano.')}
+        ${opt('open-examples', ICON.copy, 'A partir de un ejemplo', 'Elegís un esquema clásico y lo ajustás.')}
+        ${opt('import-routine', ICON.file, 'Importar archivo', 'Una rutina que exportaste o que te pasaron.')}
+      </div>
+    </section>`;
+}
+
+// Hoja inferior con las rutinas de ejemplo. Elegir una la abre en el editor para revisarla antes de guardar.
+function examplesSheet() {
+  return `
+    <div class="sheet-bg" data-act="close-sheet"></div>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="sheet-head">
+        <h2 id="sheet-title">Rutinas de ejemplo</h2>
+        <button class="icon-btn" data-act="close-sheet" aria-label="Cerrar">✕</button>
+      </div>
+      <p class="muted">Esquemas clásicos para arrancar. Se abren en el editor para que cambies lo que quieras antes de guardar.</p>
+      <div class="card list">
+        ${TEMPLATES.map((t, i) => `
+          <button class="list-row" data-act="use-example" data-i="${i}">
+            <span class="row-main">
+              <span class="row-title ex-title">${esc(t.name)}<span class="tag soft">${esc(t.level)}</span></span>
+              <span class="row-sub">${esc(t.desc)}</span>
+              <span class="row-meta">${t.days.length} días: ${t.days.map(([name]) => esc(name)).join(', ')}. ${esc(cap(t.freq))}.</span>
+            </span>
+            <span class="chev">${ICON.next}</span>
+          </button>`).join('')}
+      </div>
+    </section>`;
 }
 
 function startSession(dayId) {
@@ -725,7 +817,7 @@ function startSession(dayId) {
   }
   db.current = {
     id: uid(), routineId: r.id, routineName: r.name, dayId, dayName: day.name, dayIndex: r.days.indexOf(day), start: Date.now(),
-    plan, phases: { warmup: structuredClone(r.warmup), cooldown: structuredClone(r.cooldown) },
+    plan, phases: { warmup: structuredClone(day.warmup || emptyPhase()), cooldown: structuredClone(day.cooldown || emptyPhase()) },
     warmup: [], cooldown: [], ex, note: '',
   };
   save();
@@ -858,6 +950,9 @@ function finish() {
 }
 
 /* ---------- Rutinas ---------- */
+// Acción de la tarjeta de rutina: solo ícono, con el nombre para lectores de pantalla y como ayuda al mantener apretado.
+const rtBtn = (act, id, icon, label, cls = '') =>
+  `<button class="icon-btn ${cls}" data-act="${act}" data-id="${id}" aria-label="${label}" title="${label}">${icon}</button>`;
 function renderRoutines() {
   app.innerHTML = `
     ${appbar({ title: 'Rutinas', cls: 'solo' })}
@@ -875,22 +970,30 @@ function renderRoutines() {
           <div class="rt-top"><span class="rt-name">${esc(r.name)}</span>${active ? '<span class="tag">En uso</span>' : ''}</div>
           <span class="row-sub">${r.days.length} ${r.days.length === 1 ? 'día' : 'días'} y ${nEx} ejercicios</span>
           <div class="plates" aria-hidden="true">${r.days.map((_, i) => `<span class="plate" ${plateVar(i)}></span>`).join('')}</div>
-          <div class="row">
-            ${active ? '' : `<button class="mini" data-act="use-routine" data-id="${id}">Usar</button>`}
-            <button class="mini" data-act="edit-routine" data-id="${id}">Editar</button>
-            <button class="mini" data-act="dup-routine" data-id="${id}">Duplicar</button>
-            ${active ? '' : `<button class="mini danger" data-act="del-routine" data-id="${id}">Eliminar</button>`}
+          <div class="row rt-actions">
+            ${active ? '' : `<button class="mini use" data-act="use-routine" data-id="${id}">${ICON.check}Usar</button>`}
+            ${rtBtn('edit-routine', id, ICON.pencil, 'Editar')}
+            ${rtBtn('dup-routine', id, ICON.copy, 'Duplicar')}
+            ${rtBtn('export-routine', id, ICON.download, 'Exportar')}
+            ${active ? '' : rtBtn('del-routine', id, ICON.trash, 'Eliminar', 'danger')}
           </div>
         </div>`;
-      }).join('') || '<p class="empty">Todavía no hay rutinas. Creá la primera con el botón de abajo.</p>'}
+      }).join('') || '<p class="empty">Todavía no hay rutinas. Creá la primera con el botón de abajo: desde cero, a partir de un ejemplo o importando un archivo.</p>'}
     </div>
-    ${fab('new-routine', 'Nueva rutina')}`;
+    ${fab('new-menu', 'Nueva rutina')}
+    ${newSheets()}`;
 }
 
 /* ---------- Editor de rutinas ---------- */
 // Se edita un borrador (db.draft) que se guarda en cada tecla; la rutina real cambia recién al tocar "Guardar".
 const newEx = () => ({ name: '', sets: '3', reps: '', weight: '', rest: '' });
-const newDay = n => ({ id: uid(), name: `Día ${n}`, ex: [newEx()] });
+// Un día nuevo copia la entrada en calor y la elongación del anterior: suelen repetirse o cambiar poco.
+const newDay = (n, prev) => ({ id: uid(), name: `Día ${n}`, ex: [newEx()],
+  warmup: structuredClone(prev?.warmup || emptyPhase()), cooldown: structuredClone(prev?.cooldown || emptyPhase()) });
+// Nombres de entrada en calor y elongación de una rutina (para el autocompletar y "Tus ejercicios").
+const routinePhaseNames = r => r.days.flatMap(d => PHASES.flatMap(([k]) => (d[k]?.items || []).map(i => i.name)));
+
+let edDay = 0, edOpen = null;   // editor: pestaña del día visible y ruta del ejercicio o ítem abierto ("days.0.ex.2")
 
 function openEditor(routine, copy = false) {
   if (routine && !copy && db.draft?.draftOf === routine.id) return go('edit');
@@ -898,15 +1001,18 @@ function openEditor(routine, copy = false) {
   if (routine) {
     db.draft = structuredClone(routine);
     db.draft.draftOf = copy ? null : routine.id;
-    if (copy) { db.draft.name += ' (copia)'; delete db.draft.created; }
+    // copy: true = duplicar una rutina; 'example' = rutina de ejemplo, que queda con su nombre.
+    if (copy) { if (copy === true) db.draft.name += ' (copia)'; delete db.draft.created; }
   } else {
-    db.draft = { name: '', note: '', warmup: emptyPhase(), cooldown: emptyPhase(), days: [newDay(1)], draftOf: null };
+    db.draft = { name: '', note: '', days: [newDay(1)], draftOf: null };
   }
+  edDay = 0; edOpen = routine ? null : 'days.0.ex.0';
   save(); go('edit');
 }
 
 function renderEditor() {
   const d = db.draft;
+  edDay = Math.max(0, Math.min(edDay, d.days.length - 1));
   app.innerHTML = `
     ${appbar({ title: d.draftOf ? 'Editar rutina' : 'Nueva rutina', cls: 'sticky',
       left: '<button class="bar-btn" data-act="ed-cancel">Cancelar</button>',
@@ -916,16 +1022,20 @@ function renderEditor() {
       <label class="lbl">Nombre<input class="inp" data-p="name" value="${esc(d.name)}" placeholder="Ej.: Rutina noviembre" autocomplete="off"></label>
       <label class="lbl">Nota (opcional)<textarea class="inp" data-p="note" rows="2" placeholder="Aclaraciones generales">${esc(d.note)}</textarea></label>
     </div>
-    ${phaseEditor(...PHASES[0])}
+    <div class="day-tabs" role="tablist" aria-label="Días">
+      ${d.days.map((day, i) => `
+        <button class="day-tab ${i === edDay ? 'on' : ''}" role="tab" aria-selected="${i === edDay}" data-act="ed-day" data-d="${i}">
+          <span class="plate xs" ${plateVar(i)}></span><span class="day-tab-name">${esc(String(day.name).trim() || `Día ${i + 1}`)}</span>
+        </button>`).join('')}
+      <button class="day-tab add" data-act="ed-add-day">+ Día</button>
+    </div>
     ${d.days.map(dayEditor).join('')}
-    <button class="mini block" data-act="ed-add-day">+ Agregar día</button>
-    ${phaseEditor(...PHASES[1])}
     <button class="primary" data-act="ed-save">Guardar rutina</button>
     <button class="ghost block" data-act="ed-cancel">Cancelar</button>
     </div>
     ${datalist('ex-names', knownNames(r => r.days.flatMap(day => day.ex.map(e => e.name)), s => (s.plan || []).map(e => e.name), EXERCISES))}
     ${datalist('phase-items', knownNames(
-      r => [...PHASES.flatMap(([k]) => r[k].items.map(i => i.name)), ...r.days.flatMap(day => day.ex.map(e => e.name))],
+      r => [...routinePhaseNames(r), ...r.days.flatMap(day => day.ex.map(e => e.name))],
       s => [...PHASES.flatMap(([k]) => (s.phases?.[k]?.items || []).map(i => i.name)), ...(s.plan || []).map(e => e.name)],
       [...PHASE_ITEMS, ...EXERCISES]))}
     <div id="xp-root">${xp ? xpSheet() : ''}</div>`;
@@ -1017,10 +1127,10 @@ function bodySvg(view, sel) {
 /* ---------- Selector de ejercicios con la figura del cuerpo ---------- */
 let xp = null;   // abierto: { p: ruta del campo en el borrador, g: grupo elegido, last: último grupo visto }
 
-const xpPhase = p => !p.startsWith('days.');
+const xpPhase = p => /\.(warmup|cooldown)\./.test(p);
 // Nombres que ya usaste: de las fases solo si el campo es de entrada en calor o elongación.
 const ownNames = phase => knownNames(
-  r => [...(phase ? PHASES.flatMap(([k]) => r[k].items.map(i => i.name)) : []), ...r.days.flatMap(d => d.ex.map(e => e.name))],
+  r => [...(phase ? routinePhaseNames(r) : []), ...r.days.flatMap(d => d.ex.map(e => e.name))],
   s => [...(phase ? PHASES.flatMap(([k]) => (s.phases?.[k]?.items || []).map(i => i.name)) : []), ...(s.plan || []).map(e => e.name)]);
 const XP_EXTRA = {
   propios: ['Tus ejercicios', phase => ownNames(phase)],
@@ -1052,7 +1162,7 @@ function xpSheet() {
       ${grp ? `
       <div class="card list">
         ${grp.ex.length ? grp.ex.map(n => {
-          const meta = lastText(n), on = exKey(n) === cur;
+          const meta = lastText(n), on = exKey(n) === cur || n === xp.match;
           return `
           <button class="list-row ${on ? 'next' : ''}" data-act="xp-pick" data-name="${esc(n)}">
             <span class="row-main"><span class="row-title">${esc(n)}${on ? '<span class="tag">Elegido</span>' : ''}</span>
@@ -1072,7 +1182,30 @@ function xpSheet() {
 }
 const xpRender = () => { const el = $('#xp-root'); if (el) el.innerHTML = xp ? xpSheet() : ''; };
 
-function openPicker(p) { xp = { p, g: null, last: null }; xpRender(); }
+// Palabras de un nombre para compararlo con la lista: sin tildes, conectores ni plurales.
+// Así "Press inclinado barra" coincide con "Press inclinado con barra" y "Curl bíceps mancuerna" con "Curl de bíceps con mancuernas".
+const STOP = new Set(['con', 'de', 'del', 'en', 'a', 'al', 'la', 'el', 'y', 'o']);
+const words = name => new Set(exKey(name).split('-').filter(w => w && !STOP.has(w)).map(w => w.length > 3 ? w.replace(/e?s$/, '') : w));
+// Ejercicio de la lista curada más parecido al nombre (o null) y su grupo. Si está en varios grupos, el que lo tiene
+// más arriba en su lista (el uso más común); en la entrada en calor y la elongación, primero Movilidad.
+function xpMatch(name, phase) {
+  const w = words(name);
+  if (!w.size) return null;
+  const groups = [...(phase ? [['movilidad', PHASE_ITEMS]] : []), ...MUSCLES.map(m => [m.id, m.ex]), ['cardio', CARDIO]];
+  let best = null;
+  for (const [g, list] of groups) list.forEach((n, i) => {
+    const x = words(n), inter = [...w].filter(t => x.has(t)).length, score = inter / (w.size + x.size - inter);
+    const pri = phase && g === 'movilidad' ? 0 : 1, c = { g, name: n, score, i, pri };
+    if (score >= 0.66 && (!best || score > best.score || (score === best.score && (pri < best.pri || (pri === best.pri && i < best.i))))) best = c;
+  });
+  return best;
+}
+// Con un ejercicio ya cargado, el selector abre directo en su grupo, con el ejercicio marcado.
+function openPicker(p) {
+  const [o, k] = draftRef(p), m = xpMatch(o[k] || '', xpPhase(p));
+  xp = { p, g: m?.g || null, last: m?.g || null, match: m?.name };
+  xpRender();
+}
 
 function xpClick(b) {
   switch (b.dataset.act) {
@@ -1098,62 +1231,81 @@ function xpClick(b) {
 
 const pickBtn = p => `<button class="icon-btn xp-btn" data-act="xp-open" data-p="${p}" aria-label="Elegir por músculo">${ICON.body}</button>`;
 
-function phaseEditor(kind, title, ph) {
-  const p = db.draft[kind];
+// Ejercicio o ítem de fase como acordeón: cerrado es un renglón con el resumen y abierto muestra los campos.
+// Los <details> comparten name, así que el navegador deja uno solo abierto. Su ruta en el borrador queda en edOpen.
+const exMeta = e => [e.reps ? `${e.sets || '?'} × ${e.reps}` : `${e.sets || '?'} series`, e.weight && `${e.weight} kg`, e.rest && `${e.rest} s`]
+  .filter(Boolean).join(' · ');
+const itemMeta = it => [+it.sets > 1 && `${it.sets} series`, it.reps && (/^\d+$/.test(it.reps) ? `${it.reps} reps` : it.reps)].filter(Boolean).join(' · ');
+const itemSummary = path => {
+  const [o] = draftRef(`${path}.name`);
+  return { name: String(o.name ?? '').trim(), meta: /\.ex\.\d+$/.test(path) ? exMeta(o) : itemMeta(o) };
+};
+function edItem(path, i, n, { list, ph, fields, what }) {
+  const { name, meta } = itemSummary(path);
   return `
-    <section class="card">
-      <div class="ed-head"><h2>${title}</h2></div>
-      ${p.items.length ? '' : '<p class="muted hint">Vacía: no aparece en la sesión.</p>'}
+    <details class="ed-ex" name="ed-item" data-item="${path}" ${edOpen === path ? 'open' : ''}>
+      <summary class="ed-sum"><span class="n">${i + 1}</span>
+        <span class="ed-sum-main"><span class="ed-sum-name">${esc(name || ph)}</span><span class="ed-sum-meta">${esc(meta)}</span></span></summary>
+      <div class="ed-row">
+        <input class="inp" list="${list}" data-p="${path}.name" value="${esc(name)}" placeholder="${esc(ph)}" autocomplete="off">
+        ${pickBtn(`${path}.name`)}</div>
+      <div class="ed-grid">${fields}</div>
+      <div class="ed-tools">
+        <button class="icon-btn" data-act="ed-move" data-p="${path}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
+        <button class="icon-btn" data-act="ed-move" data-p="${path}" data-dir="1" ${i === n - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button>
+        <button class="icon-btn" data-act="ed-del" data-p="${path}" aria-label="Quitar ${what}">✕</button>
+      </div>
+    </details>`;
+}
+// Al escribir, el renglón del acordeón (y la pestaña, si es el nombre del día) se actualiza sin redibujar.
+function refreshSummary(input) {
+  const dm = input.dataset.p.match(/^days\.(\d+)\.name$/);
+  if (dm) { const t = $(`.day-tab[data-d="${dm[1]}"] .day-tab-name`, app); if (t) t.textContent = input.value.trim() || `Día ${+dm[1] + 1}`; }
+  const det = input.closest('details[data-item]');
+  if (!det) return;
+  const { name, meta } = itemSummary(det.dataset.item);
+  $('.ed-sum-name', det).textContent = name || $('[data-p$=".name"]', det).placeholder;
+  $('.ed-sum-meta', det).textContent = meta;
+}
+const field = (path, k, label, val, attrs = '') =>
+  `<label class="lbl">${label}<input class="inp" data-p="${path}.${k}" value="${esc(val ?? '')}" ${attrs} autocomplete="off"></label>`;
+
+// Entrada en calor o elongación de un día. Vacía, es solo un botón para agregarla (y no aparece en la sesión).
+function phaseEditor(di, kind, title, ph) {
+  const p = db.draft.days[di][kind] ||= emptyPhase();
+  const add = label => `<button class="mini" data-act="ed-add-item" data-d="${di}" data-phase="${kind}">${label}</button>`;
+  if (!p.items.length) return `<div class="ed-phase empty">${add(`+ ${title}`)}</div>`;
+  return `
+    <div class="ed-phase">
+      <h3 class="ed-sub">${title}</h3>
       ${p.items.map((it, i) => {
-        const path = `${kind}.items.${i}`;
-        return `
-        <div class="ed-ex">
-          <div class="ed-row"><span class="n">${i + 1}</span>
-            <input class="inp" list="phase-items" data-p="${path}.name" value="${esc(it.name)}" placeholder="${esc(ph)}" autocomplete="off">
-            ${pickBtn(`${path}.name`)}</div>
-          <div class="ed-grid">
-            <label class="lbl">Series<input class="inp" data-p="${path}.sets" value="${esc(it.sets)}" inputmode="numeric" autocomplete="off"></label>
-            <label class="lbl">Reps<input class="inp" data-p="${path}.reps" value="${esc(it.reps)}" placeholder="10" autocomplete="off"></label>
-          </div>
-          <div class="ed-tools">
-            <button class="icon-btn" data-act="ed-move" data-p="${path}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
-            <button class="icon-btn" data-act="ed-move" data-p="${path}" data-dir="1" ${i === p.items.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button>
-            <button class="icon-btn" data-act="ed-del" data-p="${path}" aria-label="Quitar ítem">✕</button>
-          </div>
-        </div>`;
+        const path = `days.${di}.${kind}.items.${i}`;
+        return edItem(path, i, p.items.length, { list: 'phase-items', ph, what: 'ítem',
+          fields: field(path, 'sets', 'Series', it.sets, 'inputmode="numeric"') + field(path, 'reps', 'Reps', it.reps, 'placeholder="10"') });
       }).join('')}
-      <button class="mini" data-act="ed-add-item" data-phase="${kind}">+ ítem</button>
-    </section>`;
+      ${add('+ ítem')}
+    </div>`;
 }
 
+// Un día del editor. Se dibujan todos, pero solo se ve el de la pestaña elegida.
 function dayEditor(day, di) {
   return `
-    <section class="card">
+    <section class="card ed-day" role="tabpanel" ${di === edDay ? '' : 'hidden'}>
       <div class="ed-row">
         <input class="inp day-inp" data-p="days.${di}.name" value="${esc(day.name)}" placeholder="Nombre del día" autocomplete="off">
         <button class="icon-btn" data-act="ed-del" data-p="days.${di}" aria-label="Eliminar día">✕</button>
       </div>
+      ${phaseEditor(di, ...PHASES[0])}
+      <h3 class="ed-sub">Ejercicios</h3>
       ${day.ex.map((e, ei) => {
         const p = `days.${di}.ex.${ei}`;
-        return `
-        <div class="ed-ex">
-          <div class="ed-row"><span class="n">${ei + 1}</span>
-            <input class="inp" list="ex-names" data-p="${p}.name" value="${esc(e.name)}" placeholder="Ejercicio" autocomplete="off">
-            ${pickBtn(`${p}.name`)}</div>
-          <div class="ed-grid">
-            <label class="lbl">Series<input class="inp" data-p="${p}.sets" value="${esc(e.sets)}" inputmode="numeric" autocomplete="off"></label>
-            <label class="lbl">Reps<input class="inp" data-p="${p}.reps" value="${esc(e.reps)}" placeholder="8–10" autocomplete="off"></label>
-            <label class="lbl">Peso (kg)<input class="inp" data-p="${p}.weight" value="${esc(e.weight ?? '')}" placeholder="—" inputmode="decimal" autocomplete="off"></label>
-            <label class="lbl">Descanso (s)<input class="inp" data-p="${p}.rest" value="${esc(e.rest ?? '')}" placeholder="${restDefault()}" inputmode="numeric" autocomplete="off"></label>
-          </div>
-          <div class="ed-tools">
-            <button class="icon-btn" data-act="ed-move" data-p="${p}" data-dir="-1" ${ei === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
-            <button class="icon-btn" data-act="ed-move" data-p="${p}" data-dir="1" ${ei === day.ex.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button>
-            <button class="icon-btn" data-act="ed-del" data-p="${p}" aria-label="Quitar ejercicio">✕</button>
-          </div>
-        </div>`;
+        return edItem(p, ei, day.ex.length, { list: 'ex-names', ph: 'Ejercicio', what: 'ejercicio',
+          fields: field(p, 'sets', 'Series', e.sets, 'inputmode="numeric"') + field(p, 'reps', 'Reps', e.reps, 'placeholder="8–10"')
+            + field(p, 'weight', 'Peso (kg)', e.weight, 'placeholder="—" inputmode="decimal"')
+            + field(p, 'rest', 'Descanso (s)', e.rest, `placeholder="${restDefault()}" inputmode="numeric"`) });
       }).join('')}
       <button class="mini" data-act="ed-add-ex" data-d="${di}">+ ejercicio</button>
+      ${phaseEditor(di, ...PHASES[1])}
     </section>`;
 }
 
@@ -1173,6 +1325,7 @@ function editAndFocus(selector) {
 // Fila nueva: se muestra y se abre el selector; "Escribir el nombre" pasa al teclado.
 function addAndPick(p) {
   xp = { p, g: null, last: null };
+  edOpen = p.replace(/\.name$/, '');
   save(); renderEditor();
   $(`[data-p="${p}"]`, app)?.scrollIntoView({ block: 'center' });
 }
@@ -1181,7 +1334,7 @@ function saveDraft() {
   const d = db.draft;
   const name = String(d.name).trim();
   if (!name) { toast('Poné un nombre a la rutina'); return $('[data-p="name"]', app)?.focus(); }
-  const phase = p => ({ items: p.items.map(it => parsePhaseItem(it))
+  const phase = p => ({ items: (p?.items || []).map(it => parsePhaseItem(it))
     .map(it => ({ name: it.name.trim(), sets: clampInt(it.sets, 1, 10, 1), reps: it.reps.trim() })).filter(it => it.name) });
   const days = d.days.map((day, i) => ({
     id: day.id || uid(),
@@ -1193,12 +1346,12 @@ function saveDraft() {
       weight: String(e.weight ?? '').trim().replace(',', '.') || null,
       rest: String(e.rest ?? '').trim() ? clampInt(e.rest, 10, 600, restDefault()) : null,
     })),
+    warmup: phase(day.warmup), cooldown: phase(day.cooldown),
   }));
   if (!days.length) return toast('Agregá al menos un día');
   const empty = days.find(day => !day.ex.length);
-  if (empty) return toast(`${empty.name} no tiene ejercicios`);
-  const r = { id: d.draftOf || uid(), name, note: String(d.note).trim(), created: d.created || Date.now(),
-    warmup: phase(d.warmup), cooldown: phase(d.cooldown), days };
+  if (empty) { edDay = days.indexOf(empty); renderEditor(); return toast(`${empty.name} no tiene ejercicios`); }
+  const r = { id: d.draftOf || uid(), name, note: String(d.note).trim(), created: d.created || Date.now(), days };
   const i = db.routines.findIndex(x => x.id === r.id);
   if (i >= 0) db.routines[i] = r; else db.routines.push(r);
   db.draft = null;
@@ -1215,8 +1368,10 @@ function editorClick(b) {
     case 'ed-cancel':
       if (confirm('¿Descartar los cambios de esta rutina?')) { db.draft = null; save(); go('routines'); }
       return true;
+    case 'ed-day': edDay = +b.dataset.d; edOpen = null; return save(), renderEditor(), true;
     case 'ed-add-day':
-      d.days.push(newDay(d.days.length + 1));
+      d.days.push(newDay(d.days.length + 1, d.days.at(-1)));
+      edDay = d.days.length - 1; edOpen = `days.${edDay}.ex.0`;
       return editAndFocus(`[data-p="days.${d.days.length - 1}.ex.0.name"]`), true;
     case 'ed-add-ex': {
       const di = +b.dataset.d, ex = d.days[di].ex;
@@ -1224,21 +1379,23 @@ function editorClick(b) {
       return addAndPick(`days.${di}.ex.${ex.length - 1}.name`), true;
     }
     case 'ed-add-item': {
-      const kind = b.dataset.phase, items = d[kind].items;
+      const di = +b.dataset.d, kind = b.dataset.phase, items = d.days[di][kind].items;
       items.push({ name: '', sets: items.at(-1)?.sets || '1', reps: '' });
-      return addAndPick(`${kind}.items.${items.length - 1}.name`), true;
+      return addAndPick(`days.${di}.${kind}.items.${items.length - 1}.name`), true;
     }
     case 'ed-del': {
       const [arr, i] = draftRef(b.dataset.p);
       if (/^days\.\d+$/.test(b.dataset.p) && arr[i].ex.some(e => String(e.name).trim())
         && !confirm(`¿Eliminar ${arr[i].name || 'este día'} con todos sus ejercicios?`)) return true;
       arr.splice(+i, 1);
+      if (edOpen?.startsWith(b.dataset.p)) edOpen = null;
       return save(), renderEditor(), true;
     }
     case 'ed-move': {
       const [arr, i] = draftRef(b.dataset.p), j = +i + +b.dataset.dir;
       if (j < 0 || j >= arr.length) return true;
       [arr[i], arr[j]] = [arr[j], arr[i]];
+      if (edOpen === b.dataset.p) edOpen = b.dataset.p.replace(/\d+$/, j);
       return save(), renderEditor(), true;
     }
   }
@@ -1315,32 +1472,72 @@ function renderSettings() {
         <h2 class="set-title">Copia de seguridad</h2>
         <p class="muted set-desc">Las rutinas y el historial se guardan solo en este navegador. Exportá una copia de vez en cuando.</p>
         <div class="row">
-          <button class="mini" data-act="export">Exportar JSON</button>
-          <button class="mini" data-act="import">Importar JSON</button>
+          <button class="mini" data-act="export">Exportar copia</button>
+          <button class="mini" data-act="import">Importar copia</button>
         </div>
         <input type="file" id="file" accept="application/json,.json" hidden>
       </section>
     </div>`;
 }
 
-function exportData() {
-  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `simplegym-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const exportData = () => downloadJSON(db, `simplegym-${new Date().toISOString().slice(0, 10)}.json`);
+
+/* ---------- Rutina suelta en un archivo ---------- */
+// Formato: { type: 'simplegym-rutina', v: 2, routine: { name, note, warmup, cooldown, days } }, sin ids ni historial.
+// Sirve para guardar una rutina aparte o pasársela a otra persona.
+const ROUTINE_FILE = 'simplegym-rutina';
+function exportRoutine(r) {
+  const days = r.days.map(d => ({ name: d.name, warmup: d.warmup, ex: d.ex.map(({ name, sets, reps, weight, rest }) => ({ name, sets, reps, weight, rest })),
+    cooldown: d.cooldown }));
+  downloadJSON({ type: ROUTINE_FILE, v: 2, routine: { name: r.name, note: r.note, days } },
+    `rutina-${exKey(r.name)}.json`);
+}
+
+// Archivo → borrador de rutina. Acepta el formato de arriba o la rutina sola; devuelve null si no tiene días.
+// Si trae entrada en calor o elongación a nivel rutina (formato anterior), se copian a los días que no tengan las suyas.
+// No hace falta validar cada campo: el editor y "Guardar" normalizan todo, igual que con una rutina escrita a mano.
+function routineFromFile(data) {
+  const r = data?.type === ROUTINE_FILE ? data.routine : data;
+  if (!r || !Array.isArray(r.days) || !r.days.length) return null;
+  const list = v => Array.isArray(v) ? v : [];
+  const phase = p => normPhase({ ...p, items: list(p?.items) });
+  return {
+    name: String(r.name ?? ''), note: String(r.note ?? ''),
+    days: r.days.map((d, i) => ({
+      id: uid(), name: String(d?.name ?? `Día ${i + 1}`),
+      warmup: phase(d?.warmup || r.warmup), cooldown: phase(d?.cooldown || r.cooldown),
+      ex: list(d?.ex).map(e => ({ name: String(e?.name ?? ''), sets: e?.sets ?? 3, reps: String(e?.reps ?? ''),
+        weight: e?.weight ?? '', rest: e?.rest ?? '' })),
+    })),
+  };
+}
+
+async function importRoutine(file) {
+  let data = null;
+  try { data = JSON.parse(await file.text()); } catch {}
+  const r = routineFromFile(data);
+  if (r) return openEditor(r, 'example');
+  toast(Array.isArray(data?.routines) ? 'Es una copia completa: importala desde Configuración' : 'Archivo no válido');
 }
 
 async function importData(file) {
   try {
     const data = JSON.parse(await file.text());
-    if (!Array.isArray(data.sessions)) throw new Error();
+    // Solo copias del formato actual: las de la primera versión (sin "v") ya no se convierten.
+    if (data.v !== 2 || !Array.isArray(data.sessions)) throw new Error();
     const ids = new Set(db.sessions.map(s => s.id));
-    const added = data.sessions.filter(s => s && s.id && !ids.has(s.id)).map(upgradeSession);
+    const added = data.sessions.filter(s => s && s.id && !ids.has(s.id));
     db.sessions = [...db.sessions, ...added].sort((a, b) => a.start - b.start);
-    // Rutinas: las del archivo que no estén ya (un backup de la versión 1 trae la rutina inicial).
-    const incoming = Array.isArray(data.routines) ? data.routines : data.v === 2 ? [] : [legacyRoutine()];
+    // Rutinas: las del archivo que no estén ya.
+    const incoming = Array.isArray(data.routines) ? data.routines : [];
     const newRoutines = incoming.filter(r => r?.id && Array.isArray(r.days) && !routineById(r.id));
     db.routines.push(...newRoutines);
     if (!activeRoutine() && db.routines.length) db.activeId = db.routines[0].id;
@@ -1366,7 +1563,13 @@ app.addEventListener('click', ev => {
     case 'open-picker': pickerOpen = true; render(); break;
     case 'close-picker': pickerOpen = false; render(); break;
     case 'start': startSession(b.dataset.day); break;
-    case 'new-routine': openEditor(null); break;
+    case 'new-routine': sheet = null; render(); openEditor(null); break;
+    case 'new-menu': sheet = 'new'; render(); break;
+    case 'open-examples': sheet = 'examples'; render(); break;
+    case 'close-sheet': sheet = null; render(); break;
+    case 'use-example': openEditor(fromTemplate(TEMPLATES[+b.dataset.i]), 'example'); break;
+    case 'import-routine': sheet = null; render(); $('#routine-file').value = ''; $('#routine-file').click(); break;
+    case 'export-routine': exportRoutine(routineById(id)); break;
     case 'edit-routine': openEditor(routineById(id)); break;
     case 'dup-routine': openEditor(routineById(id), true); break;
     case 'use-routine':
@@ -1420,6 +1623,7 @@ app.addEventListener('input', ev => {
   if (t.dataset.p && db.draft) {
     const [o, k] = draftRef(t.dataset.p);
     o[k] = t.value;
+    refreshSummary(t);
     return save();
   }
   const s = db.current;
@@ -1429,9 +1633,17 @@ app.addEventListener('input', ev => {
   if (row && card) { s.ex[card.dataset.ex][+row.dataset.i][t.dataset.k] = t.value.trim(); save(); }
 });
 
+app.addEventListener('toggle', ev => {
+  const path = ev.target.dataset?.item;
+  if (!path) return;
+  if (ev.target.open) edOpen = path; else if (edOpen === path) edOpen = null;
+}, true);
+
 app.addEventListener('change', ev => {
   if (ev.target.id === 'file' && ev.target.files[0]) importData(ev.target.files[0]);
 });
+// Fuera de #app: sigue existiendo aunque la pantalla se vuelva a dibujar mientras se elige el archivo.
+$('#routine-file').addEventListener('change', ev => { if (ev.target.files[0]) importRoutine(ev.target.files[0]); });
 
 // Seleccionar el contenido al enfocar un número: más rápido de corregir
 app.addEventListener('focusin', ev => { if (ev.target.matches('.field input')) ev.target.select(); });

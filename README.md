@@ -23,13 +23,15 @@ Con el archivo abierto directamente (`file://`) la app funciona, pero sin modo o
 
 ## Rutinas
 
-Las rutinas se cargan desde la app, en **Rutinas → + Nueva rutina**: días, ejercicios (series, reps, peso sugerido y descanso, opcionales los dos últimos), entrada en calor y elongación (ejercicio, series y reps). Se pueden guardar varias y elegir cuál está en uso; **Duplicar** sirve para armar la siguiente a partir de la actual.
+El botón **Nueva rutina** (en **Rutinas**) ofrece empezar desde cero, a partir de un ejemplo o importando un archivo. En el editor, cada día tiene su pestaña y cada ejercicio se abre como acordeón para editarlo. Una rutina tiene días, ejercicios (series, reps, peso sugerido y descanso, opcionales los dos últimos) y, para cada día, su entrada en calor y elongación (ejercicio, series y reps; al agregar un día se copian las del anterior). Se pueden guardar varias y elegir cuál está en uso; **Duplicar** sirve para armar la siguiente a partir de la actual.
 
 Para no escribir en el teléfono, el botón con la figurita (o **+ ejercicio**) abre un selector con el cuerpo de frente y de espalda: tocás un músculo y elegís el ejercicio de la lista (`MUSCLES` en `index.html`). También hay atajos para tus ejercicios, cardio y movilidad. Al escribir el nombre de un ejercicio, la app sugiere los que ya usaste y una lista de ejercicios comunes (`EXERCISES` y `PHASE_ITEMS` en `index.html`). El peso sugerido se precarga la primera vez que hacés el ejercicio con esa rutina; después se usa el último peso real.
 
 El historial se vincula por nombre de ejercicio (sin importar mayúsculas ni tildes): si "Sentadilla copa" aparece en una rutina nueva, muestra lo que hiciste la última vez y precarga el peso. El descanso por defecto se elige en **Configuración**; si un ejercicio tiene descanso propio en la rutina, se usa ese.
 
-`LEGACY_ROUTINE` en `index.html` solo se usa para migrar los datos de la primera versión de la app.
+Los ejemplos son esquemas clásicos (cuerpo completo, fuerza 5×5, torso/piernas, empuje/tirón/piernas y una con mancuernas para casa). El elegido se abre en el editor para ajustarlo antes de guardar. Están en `TEMPLATES`, en `index.html`.
+
+Cada rutina se puede **Exportar** a un archivo JSON (sin historial) y **Nueva rutina → Importar archivo** la vuelve a cargar, también en el editor, para revisarla antes de guardar. Sirve para guardar rutinas aparte o pasárselas a otra persona. La copia completa (rutinas + historial) sigue estando en **Configuración**.
 
 ## Desarrollo
 

@@ -49,7 +49,7 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const APP = `http://127.0.0.1:${server.address().port}/index.html`;
 
-// Perfil nuevo en cada corrida: localStorage vacío, así la prueba de migración arranca de cero.
+// Perfil nuevo en cada corrida: localStorage vacío, así la app arranca sin rutinas.
 const PROFILE = path.join(OUT, 'perfil');
 fs.rmSync(PROFILE, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
@@ -105,28 +105,76 @@ try {
   await cmd('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await cmd('Page.navigate', { url: APP }); await sleep(800);
 
-  /* ---------- 1. Migración desde la primera versión ---------- */
+  /* ---------- 0. Sin rutinas: rutinas de ejemplo ---------- */
+  ok(await ev(`!!document.querySelector('.empty-card [data-act=new-menu]')`), 'inicio vacío: botón Crear rutina');
+  await click('.empty-card [data-act=new-menu]'); await sleep(200);
+  ok(await ev(`[...document.querySelectorAll('.sheet .list-row')].map(b => b.dataset.act).join(',')`) === 'new-routine,open-examples,import-routine',
+    'nueva rutina: menú con desde cero, ejemplo e importar');
+  await shot('00-menu-nueva', 'pantalla');
+  ok(await ev(`TEMPLATES.every(t => t.days.every(([, ex]) => ex.every(([n]) => EXERCISES.includes(n))))`), 'ejemplos: todos los ejercicios están en la lista curada');
+  ok(await ev(`TEMPLATES.every(t => t.days.every(([, , w = t.warmup, c = t.cooldown]) => w.length && [...w, ...c].every(([n]) => PHASE_ITEMS.includes(n) || EXERCISES.includes(n))))`),
+    'ejemplos: entrada en calor y elongación con nombres de las listas');
+  await click('.sheet [data-act=open-examples]'); await sleep(200);
+  ok(await ev(`document.querySelectorAll('.sheet [data-act=use-example]').length`) === await ev('TEMPLATES.length'), 'ejemplos: la hoja muestra todas las rutinas');
+  await shot('00-ejemplos', 'pantalla');
+  await click('.sheet [data-act=use-example][data-i="0"]'); await sleep(200);
+  ok(await ev(`location.hash === '#edit' && db.draft.name === 'Cuerpo completo' && !db.draft.draftOf && db.draft.days.length === 2`), 'ejemplos: se abre en el editor como rutina nueva');
+  await click('.primary[data-act=ed-save]'); await sleep(300);
+  ok(await ev(`db.routines.length === 1 && db.activeId === db.routines[0].id && db.routines[0].name === 'Cuerpo completo'`), 'ejemplos: guardada y en uso');
+  ok(await ev(`(() => { const e = db.routines[0].days[0].ex[0]; return e.name === 'Sentadilla con barra' && e.sets === 3 && e.reps === '8–10' && e.rest === 120 && e.weight === null; })()`),
+    'ejemplos: series, reps y descanso de la plantilla');
+  ok(await ev(`db.routines[0].days.every(d => d.warmup.items.length === 4 && d.cooldown.items.length === 4) && !!db.routines[0].note`), 'ejemplos: cada día con entrada en calor y elongación, y nota');
+  ok(await ev(`(() => { const r = fromTemplate(TEMPLATES.find(t => t.name === 'Torso / Piernas')); return r.days[0].warmup.items[0].name !== r.days[1].warmup.items[0].name
+    && r.days[0].warmup.items[0].name === r.days[2].warmup.items[0].name; })()`), 'ejemplos: torso y piernas con entrada en calor distinta');
+  await go('routines');
+  ok(await ev(`!document.querySelector('.content [data-act=open-examples], .content [data-act=import-routine]')`), 'rutinas: sin botones sueltos, todo en el menú');
+  ok(await ev(`['edit-routine', 'dup-routine', 'export-routine'].every(a => { const b = document.querySelector('.rt-actions [data-act=' + a + ']'); return b?.querySelector('svg') && b.getAttribute('aria-label'); })`),
+    'rutinas: acciones con ícono y nombre accesible');
+  await shot('00-rutinas', 400);
+  await click('[data-act=new-menu]'); await sleep(200);
+  await click('.sheet [data-act=open-examples]'); await sleep(200);
+  ok(await ev(`!!document.querySelector('.sheet [data-act=use-example]')`), 'ejemplos: también desde la pestaña Rutinas');
+  await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await sleep(150);
+  ok(await ev(`!document.querySelector('.sheet')`), 'ejemplos: Escape cierra la hoja');
+
+  /* ---------- 1. Datos guardados ---------- */
+  // Los datos de la primera versión (sin "v") ya no se cargan.
+  await ev(`localStorage.setItem('simplegym:v1', JSON.stringify({ sessions: [{ id: 'x', dayId: 'd1', start: 1, ex: {} }] })); location.hash = ''`);
+  await reload();
+  ok(await ev('db.routines.length === 0 && db.sessions.length === 0'), 'datos de la primera versión: se ignoran');
+
+  // Formato v2 anterior: entrada en calor en texto libre con "vueltas" para toda la fase.
   const t0 = Date.now() - 86400000;
-  const v1 = {
-    sessions: [{ id: 'a', dayId: 'd1', start: t0, end: t0 + 3600000, warmup: [true, true], note: 'ok',
-      ex: { 'sentadilla-copa': [{ w: '20', r: '10', done: true }, { w: '22', r: '8', done: true }], 'curl-biceps-manc': [{ w: '8', r: '10', done: true }] } }],
-    current: { id: 'b', dayId: 'd2', start: Date.now(), warmup: [true], note: '',
+  const oldWarmup = { rounds: 2, items: ['10 × Puente de glúteos', '10 × Ranas a 1 pierna', '30" Plancha', '10 × Círculos de brazos'] };
+  const plan = names => names.map(name => ({ key: name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, sets: 3, reps: '10', rest: null }));
+  const day1 = ['Sentadilla copa', 'Curl de bíceps con mancuernas', 'Sentadilla Zercher'];
+  const day2 = ['Peso muerto rumano', 'Remo con mancuerna', 'Vuelos laterales', 'Plancha', 'Press militar con mancuernas', 'Gemelos parado'];
+  const v2 = {
+    v: 2, activeId: 'r1', draft: null, settings: { fontScale: 1, restSeconds: 90 },
+    routines: [{ id: 'r1', name: 'Rutina de prueba', note: '', created: t0, warmup: oldWarmup, cooldown: { items: [] }, days: [
+      { id: 'd1', name: 'Día 1', ex: day1.map(name => ({ name, sets: 3, reps: '10', rest: null })) },
+      { id: 'd2', name: 'Día 2', ex: day2.map(name => ({ name, sets: 3, reps: '10', rest: null })) }] }],
+    sessions: [{ id: 'a', routineId: 'r1', routineName: 'Rutina de prueba', dayId: 'd1', dayName: 'Día 1', start: t0, end: t0 + 3600000,
+      warmup: [true, true], cooldown: [], note: 'ok', plan: plan(day1), phases: { warmup: oldWarmup, cooldown: { items: [] } },
+      ex: { 'sentadilla-copa': [{ w: '20', r: '10', done: true }, { w: '22', r: '8', done: true }], 'curl-de-biceps-con-mancuernas': [{ w: '8', r: '10', done: true }] } }],
+    current: { id: 'b', routineId: 'r1', routineName: 'Rutina de prueba', dayId: 'd2', dayName: 'Día 2', start: Date.now(),
+      warmup: [true], cooldown: [], note: '', plan: plan(day2), phases: { warmup: oldWarmup, cooldown: { items: [] } },
       ex: { 'peso-muerto-rumano': [{ w: '40', r: '8', done: true }, { w: '40', r: '', done: false }] } },
   };
-  await ev(`localStorage.setItem('simplegym:v1', ${JSON.stringify(JSON.stringify(v1))}); location.hash = ''`);
+  await ev(`localStorage.setItem('simplegym:v1', ${JSON.stringify(JSON.stringify(v2))}); location.hash = ''`);
   await reload();
-  ok(await ev('db.v') === 2, 'migración: formato de datos v2');
-  ok(await ev('db.routines.length === 1 && db.activeId === "r1"'), 'migración: rutina inicial creada y en uso');
-  ok(await ev('JSON.stringify(Object.keys(db.sessions[0].ex))') === '["sentadilla-copa","curl-biceps-mancuerna"]', 'migración: ejercicios identificados por nombre');
-  ok(await ev('db.current.dayName === "Día 2" && db.current.plan.length === 6 && db.current.ex["peso-muerto-rumano-barra-o-manc"].length === 2'), 'migración: la sesión en curso se conserva');
-  ok(await ev('JSON.stringify(db.routines[0].warmup.items[0]) + JSON.stringify(db.routines[0].warmup.items[2])')
-    === '{"name":"Cadera frontal + isquios","sets":2,"reps":"10"}{"name":"Piramidal parado, pierna en cajón","sets":2,"reps":"30\\""}',
-    'migración: entrada en calor separada en ejercicio, series (las 2 vueltas) y reps');
-  ok(await ev(`!('rounds' in db.routines[0].warmup) && !('rounds' in db.current.phases.warmup)`), 'migración: ya no quedan vueltas');
-  ok(await ev('db.sessions[0].phases.warmup.items[1].name === "Ranas a 1 pierna" && db.current.phases.warmup.items[1].reps === "10"'), 'migración: también en sesiones guardadas y en curso');
+  ok(await ev('db.routines.length === 1 && db.activeId === "r1" && db.sessions.length === 1'), 'datos guardados: se cargan rutina y sesiones');
+  ok(await ev('db.current.dayName === "Día 2" && db.current.plan.length === 6 && db.current.ex["peso-muerto-rumano"].length === 2'), 'datos guardados: la sesión en curso se conserva');
+  ok(await ev('JSON.stringify(db.routines[0].days[1].warmup.items[0]) + JSON.stringify(db.routines[0].days[1].warmup.items[2])')
+    === '{"name":"Puente de glúteos","sets":2,"reps":"10"}{"name":"Plancha","sets":2,"reps":"30\\""}',
+    'fases viejas: entrada en calor separada en ejercicio, series (las 2 vueltas) y reps');
+  ok(await ev(`!('rounds' in db.routines[0].days[0].warmup) && !('rounds' in db.current.phases.warmup)`), 'fases viejas: ya no quedan vueltas');
+  ok(await ev(`!('warmup' in db.routines[0]) && !('cooldown' in db.routines[0]) && db.routines[0].days.every(d => d.warmup.items.length === 4 && d.cooldown.items.length === 0)`),
+    'fases de la rutina: pasan a cada día');
+  ok(await ev('db.sessions[0].phases.warmup.items[1].name === "Ranas a 1 pierna" && db.current.phases.warmup.items[1].reps === "10"'), 'fases viejas: también en sesiones guardadas y en curso');
   ok(await ev('lastSets(exKey("Sentadilla Copa")).sets.length') === 2, 'historial vinculado por nombre, sin importar mayúsculas');
   await go('session');
-  ok(await ev(`document.querySelector('[data-count=warmup]').textContent`) === '1/8', 'migración: la sesión en curso conserva lo marcado (1/8)');
+  ok(await ev(`document.querySelector('[data-count=warmup]').textContent`) === '1/8', 'fases viejas: la sesión en curso conserva lo marcado (1/8)');
   ok(await ev(`document.querySelectorAll('.phase .wu-row')[0].querySelectorAll('[data-act=phase]').length`) === 2, 'sesión: un check por serie en la entrada en calor');
   await shot('01-sesion-migrada', 900);
   await go('');
@@ -134,11 +182,13 @@ try {
 
   /* ---------- 2. Crear una rutina con el editor ---------- */
   await go('routines');
-  await click('[data-act=new-routine]');
+  await click('[data-act=new-menu]'); await sleep(150);
+  await click('.sheet [data-act=new-routine]'); await sleep(150);
   await type('[data-p="name"]', 'Rutina diciembre');
-  await click('[data-act=ed-add-item][data-phase=warmup]');
-  await type('[data-p="warmup.items.0.name"]', 'Ranas');
-  await type('[data-p="warmup.items.0.reps"]', '10');
+  ok(await ev(`!document.querySelector('.ed-phase h3') && document.querySelectorAll('.ed-phase.empty [data-act=ed-add-item]').length === 2`), 'editor: el día empieza sin fases, con botones para agregarlas');
+  await click('[data-act=ed-add-item][data-phase=warmup][data-d="0"]');
+  await type('[data-p="days.0.warmup.items.0.name"]', 'Ranas');
+  await type('[data-p="days.0.warmup.items.0.reps"]', '10');
   await type('[data-p="days.0.ex.0.name"]', 'Sentadilla copa');
   await type('[data-p="days.0.ex.0.sets"]', '4');
   await type('[data-p="days.0.ex.0.reps"]', '6–8');
@@ -149,11 +199,34 @@ try {
   await click('[data-act=ed-add-ex][data-d="0"]');                                  // queda vacío: se descarta al guardar
   await click('[data-act=ed-move][data-p="days.0.ex.1"][data-dir="-1"]');
   await click('[data-act=ed-add-day]');
+  ok(await ev(`db.draft.days[1].warmup.items[0]?.name === 'Ranas' && db.draft.days[1].warmup !== db.draft.days[0].warmup`), 'editor: el día nuevo copia la entrada en calor del anterior');
   await type('[data-p="days.1.ex.0.name"]', 'Remo');
-  await click('[data-act=ed-add-item][data-phase=cooldown]');
-  await type('[data-p="cooldown.items.0.name"]', 'Isquios');
-  await type('[data-p="cooldown.items.0.reps"]', '30"');
+  await click('[data-act=ed-add-item][data-phase=cooldown][data-d="0"]');
+  await type('[data-p="days.0.cooldown.items.0.name"]', 'Isquios');
+  await type('[data-p="days.0.cooldown.items.0.reps"]', '30"');
+  ok(await ev('db.draft.days[1].cooldown.items.length') === 0, 'editor: cada día tiene su propia elongación');
   ok(await ev('db.draft.days[0].ex[0].name') === 'Press banca', 'editor: subir un ejercicio');
+  // Pestañas de días
+  const visibleDays = `[...document.querySelectorAll('.ed-day')].map(s => !s.hidden)`;
+  ok(await ev(`document.querySelectorAll('.day-tab[data-act=ed-day]').length === 2 && document.querySelector('.day-tab.on').dataset.d === '1'
+    && ${visibleDays}.join() === 'false,true'`), 'editor: una pestaña por día y se ve solo el elegido (el recién agregado)');
+  await click('.day-tab[data-d="0"]');
+  ok(await ev(`${visibleDays}.join() === 'true,false' && document.querySelector('.day-tab.on').dataset.d === '0'`), 'editor: tocar una pestaña muestra ese día');
+  await type('[data-p="days.0.name"]', 'Día A');
+  ok(await ev(`document.querySelector('.day-tab[data-d="0"]').textContent.trim()`) === 'Día A', 'editor: la pestaña se actualiza al escribir el nombre');
+  await type('[data-p="days.0.name"]', 'Día 1');
+  // Acordeón de ejercicios
+  const sum = i => ev(`(() => { const d = document.querySelector('[data-item="days.0.ex.${i}"]'); return d.querySelector('.ed-sum-name').textContent + ' | ' + d.querySelector('.ed-sum-meta').textContent; })()`);
+  ok(await sum(0) === 'Press banca | 3 series · 120 s' && await sum(1) === 'Sentadilla copa | 4 × 6–8 · 25 kg', 'acordeón: cerrado muestra nombre, series, reps, peso y descanso');
+  await type('[data-p="days.0.ex.1.reps"]', '8');
+  ok(await sum(1) === 'Sentadilla copa | 4 × 8 · 25 kg', 'acordeón: el resumen se actualiza al escribir');
+  await type('[data-p="days.0.ex.1.reps"]', '6–8');
+  await ev(`document.querySelector('[data-item="days.0.ex.0"]').open = true`); await sleep(100);
+  await ev(`document.querySelector('[data-item="days.0.ex.1"]').open = true`); await sleep(100);
+  ok(await ev(`[...document.querySelectorAll('details.ed-ex[open]')].map(d => d.dataset.item).join()`) === 'days.0.ex.1', 'acordeón: se abre de a uno');
+  await click('[data-act=ed-move][data-p="days.0.ex.1"][data-dir="-1"]');
+  ok(await ev(`[...document.querySelectorAll('details.ed-ex[open]')].map(d => d.dataset.item).join()`) === 'days.0.ex.0', 'acordeón: al subir un ejercicio sigue abierto');
+  await click('[data-act=ed-move][data-p="days.0.ex.0"][data-dir="1"]');
   await reload();
   ok(await ev('db.draft?.name') === 'Rutina diciembre', 'editor: el borrador sobrevive a recargar la página');
   await go('edit');
@@ -161,7 +234,7 @@ try {
 
   // Autocompletar
   const options = id => `[...document.querySelectorAll('#${id} option')].map(x => x.value)`;
-  ok(await ev(`(() => { const o = ${options('ex-names')}; return o.indexOf('Sentadilla copa') < 25 && o.indexOf('Burpees') >= 25 && o.length > 120; })()`),
+  ok(await ev(`(() => { const o = ${options('ex-names')}; return o.indexOf('Sentadilla copa') < o.indexOf('Burpees') && o.length > 120; })()`),
     'autocompletar: primero los nombres propios, después la lista curada');
   ok(await ev(`(() => { const o = ${options('ex-names')}.map(exKey); return new Set(o).size === o.length && o.filter(k => k === 'sentadilla-zercher').length === 1; })()`),
     'autocompletar: sin repetidos entre propios y curados');
@@ -170,7 +243,7 @@ try {
     'autocompletar fases: propios primero (fases y ejercicios), después las dos listas curadas');
   ok(await ev(`(() => { const o = ${options('phase-items')}.map(exKey); return new Set(o).size === o.length && o.filter(k => k === 'plancha').length === 1; })()`),
     'autocompletar fases: sin repetidos (Plancha está en las dos listas)');
-  ok(await ev(`document.querySelector('[data-p="days.0.ex.0.name"]').list?.id === 'ex-names' && document.querySelector('[data-p="warmup.items.0.name"]').list?.id === 'phase-items'`),
+  ok(await ev(`document.querySelector('[data-p="days.0.ex.0.name"]').list?.id === 'ex-names' && document.querySelector('[data-p="days.0.warmup.items.0.name"]').list?.id === 'phase-items'`),
     'autocompletar: los campos usan sus listas');
 
   await click('.primary[data-act=ed-save]'); await sleep(300);
@@ -225,20 +298,24 @@ try {
   ok(await ev(`!!document.querySelector('[data-ex=sentadilla-copa] .sug')`), 'peso: el sugerido se sigue viendo como referencia');
 
   /* ---------- 6. Entrada en calor con series distintas por ítem ---------- */
-  await ev(`(() => { db.routines[1].warmup.items = [{ name: 'Ranas', sets: 2, reps: '10' }, { name: 'Cinta', sets: 1, reps: '5 min' }]; db.current = null; save(); })()`);
+  await ev(`(() => { db.routines[1].days[0].warmup.items = [{ name: 'Ranas', sets: 2, reps: '10' }, { name: 'Cinta', sets: 1, reps: '5 min' }]; db.current = null; save(); })()`);
   await ev('startSession(db.routines[1].days[0].id)'); await sleep(300);
   ok(await ev(`[...document.querySelectorAll('.phase')[0].querySelectorAll('.wu-row')].map(r => r.querySelectorAll('[data-act=phase]').length).join(',')`) === '2,1',
     'fases: cada ítem con su cantidad de series (2 y 1)');
   ok(await ev(`document.querySelector('[data-count=warmup]').textContent`) === '0/3', 'fases: el total es la suma de las series');
   await ev(`document.querySelectorAll('.phase')[0].querySelectorAll('.wu-row')[1].querySelector('[data-act=phase]').click()`); await sleep(100);
   ok(await ev(`document.querySelector('[data-count=warmup]').textContent`) === '1/3', 'fases: marcar suma al contador');
+  await ev(`(() => { db.routines[1].days[1].warmup.items = [{ name: 'Bicicleta fija', sets: 1, reps: '10 min' }]; db.current = null; save(); })()`);
+  await ev('startSession(db.routines[1].days[1].id)'); await sleep(300);
+  ok(await ev(`[...document.querySelectorAll('.phase')[0].querySelectorAll('.wu-row > span')].map(s => s.textContent.trim()).join(' | ')`) === '10 min Bicicleta fija'
+    && !(await ev(`[...document.querySelectorAll('.phase')].some(p => p.textContent.includes('Isquios'))`)), 'fases: cada día usa su entrada en calor y su elongación');
   await ev(`db.current = null; save()`); await go('routines');
   await click('[data-act=edit-routine]'); await sleep(150);
-  ok(await ev(`document.querySelector('[data-p="warmup.items.0.sets"]').value`) === '2', 'editor: los ítems de la entrada en calor tienen series');
-  await click('[data-act=ed-add-item][data-phase=warmup]');
-  ok(await ev('db.draft.warmup.items.length === 5 && db.draft.warmup.items[4].sets === 2'), 'editor: "+ ítem" copia las series del anterior');
-  await click('[data-act=ed-move][data-p="warmup.items.1"][data-dir="-1"]');
-  ok(await ev('db.draft.warmup.items[0].name') === 'Ranas a 1 pierna', 'editor: los ítems se pueden reordenar');
+  ok(await ev(`document.querySelector('[data-p="days.0.warmup.items.0.sets"]').value`) === '2', 'editor: los ítems de la entrada en calor tienen series');
+  await click('[data-act=ed-add-item][data-phase=warmup][data-d="0"]');
+  ok(await ev('db.draft.days[0].warmup.items.length === 5 && db.draft.days[0].warmup.items[4].sets === 2'), 'editor: "+ ítem" copia las series del anterior');
+  await click('[data-act=ed-move][data-p="days.0.warmup.items.1"][data-dir="-1"]');
+  ok(await ev('db.draft.days[0].warmup.items[0].name') === 'Ranas a 1 pierna', 'editor: los ítems se pueden reordenar');
   await ev(`db.draft = null; save()`);
 
   /* ---------- 7. Configuración ---------- */
@@ -308,9 +385,15 @@ try {
   ok(await ev(`!document.querySelector('.sheet.xp') && db.draft.days[0].ex[${nEx}].name === 'Press inclinado con mancuernas'`), 'selector: elegir completa el nombre y cierra');
   ok(await ev(`document.querySelector('[data-p="days.0.ex.${nEx}.name"]').value`) === 'Press inclinado con mancuernas', 'selector: el campo muestra el nombre elegido');
   await click(`[data-act=xp-open][data-p="days.0.ex.${nEx}.name"]`);
-  await tap('.sheet.xp path[data-g=pecho]');
+  ok(await ev(`document.querySelector('#xp-title').textContent`) === 'Pecho', 'selector: con un ejercicio cargado abre directo en su grupo');
   ok(await ev(`document.querySelector('.list-row.next')?.dataset.name`) === 'Press inclinado con mancuernas', 'selector: marca el ejercicio que ya tiene el campo');
   await click('[data-act=xp-back]');
+  ok(await ev(`document.querySelectorAll('.sheet.xp path.mz.on[data-g=pecho]').length`) === 2, 'selector: al volver, la figura tiene resaltado ese grupo');
+  ok(await ev(`(() => { const m = xpMatch('Press inclinado barra'); return m.g === 'pecho' && m.name === 'Press inclinado con barra'; })()`), 'selector: reconoce nombres escritos distinto (sin "con")');
+  ok(await ev(`xpMatch('Curl bíceps mancuerna')?.name === 'Curl de bíceps con mancuernas' && xpMatch('remo hammer neutro')?.name === 'Remo hammer'`), 'selector: sin importar plurales, conectores ni una palabra de más');
+  ok(await ev(`xpMatch('Peso muerto rumano').g === 'isquios' && xpMatch('Sentadilla búlgara').g === 'cuadriceps'`), 'selector: si está en varios grupos, elige donde es más común');
+  ok(await ev(`xpMatch('Polea alta abierto') === null && xpMatch('') === null`), 'selector: sin coincidencia, abre la figura');
+  ok(await ev(`xpMatch('Elongación de isquios', true).g === 'movilidad' && xpMatch('Puente de glúteos', true).g === 'movilidad'`), 'selector: en entrada en calor y elongación busca primero en Movilidad');
   await click('.chip[data-g=propios]');
   ok(await ev(`[...document.querySelectorAll('[data-act=xp-pick]')].map(b => b.dataset.name).includes('Press banca')`), 'selector: "Tus ejercicios" incluye nombres propios');
   await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await sleep(150);
@@ -318,8 +401,9 @@ try {
   await click('[data-act=ed-add-item][data-phase=warmup]');
   ok(await ev(`document.querySelector('.sheet.xp .chip')?.dataset.g`) === 'movilidad', 'selector: en la entrada en calor, primero Movilidad y elongación');
   await click('[data-act=xp-type]');
-  ok(await ev(`!document.querySelector('.sheet.xp') && document.activeElement?.dataset.p === 'warmup.items.' + (db.draft.warmup.items.length - 1) + '.name'`), 'selector: "Escribir el nombre" cierra y deja el cursor en el campo');
+  ok(await ev(`!document.querySelector('.sheet.xp') && document.activeElement?.dataset.p === 'days.0.warmup.items.' + (db.draft.days[0].warmup.items.length - 1) + '.name'`), 'selector: "Escribir el nombre" cierra y deja el cursor en el campo');
   await click(`[data-act=xp-open][data-p="days.0.ex.0.name"]`);
+  await click('[data-act=xp-back]');
   await ev(`(() => { const p = document.querySelector('.sheet.xp path[data-g=gemelos][tabindex]'); p.focus(); p.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`); await sleep(150);
   ok(await ev(`document.querySelector('#xp-title').textContent`) === 'Gemelos', 'selector: con teclado, Enter elige el músculo');
   ok(await ev(`!!document.querySelector('.sheet.xp [data-act=xp-back]') && !!document.querySelector('.sheet.xp [data-act=xp-type]')`), 'selector: en la lista hay Volver y Escribir un nombre nuevo');
@@ -327,7 +411,8 @@ try {
   // Con letra muy grande la hoja entra en la pantalla, y en una lista larga Volver y Cancelar siguen a la vista.
   await ev(`db.settings.fontScale = 1.3; save(); applySettings()`);
   await cmd('Emulation.setDeviceMetricsOverride', { width: 330, height: 640, deviceScaleFactor: 1, mobile: true }); await sleep(300);
-  await click(`[data-act=xp-open][data-p="days.0.ex.0.name"]`); await sleep(400);   // termina la animación de entrada
+  await click(`[data-act=xp-open][data-p="days.0.ex.0.name"]`);
+  await click('[data-act=xp-back]'); await sleep(400);   // termina la animación de entrada
   const fits = () => ev(`(() => { const r = document.querySelector('.sheet.xp').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight + 1; })()`);
   ok(await fits(), 'selector: con letra muy grande la hoja entra en la pantalla');
   await tap('.sheet.xp path[data-g=dorsales]');
@@ -339,6 +424,38 @@ try {
   await cmd('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await ev(`db.settings.fontScale = 1; save(); applySettings()`);
   await ev(`db.draft = null; save()`); await go('');
+
+  /* ---------- 9. Exportar e importar una rutina suelta ---------- */
+  // Exportar: se captura lo que se iba a descargar.
+  await go('routines');
+  await ev(`window._dl = null; window.downloadJSON = (data, name) => { window._dl = { data, name }; }`);
+  await click('[data-act=export-routine]');
+  ok(await ev(`_dl?.name === 'rutina-rutina-de-prueba.json' && _dl.data.type === 'simplegym-rutina' && _dl.data.routine.days.length === 2`), 'exportar rutina: archivo con la rutina');
+  ok(await ev(`!('id' in _dl.data.routine) && !('id' in _dl.data.routine.days[0])`), 'exportar rutina: sin ids');
+  ok(await ev(`!('warmup' in _dl.data.routine) && _dl.data.routine.days[0].warmup.items.length === 4`), 'exportar rutina: fases dentro de cada día');
+  // Importar: se carga un archivo en el input como si lo eligiera el usuario.
+  const pick = json => ev(`(() => { const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(json)}], 'r.json', { type: 'application/json' }));
+    const i = document.querySelector('#routine-file'); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true })); })()`).then(() => sleep(300));
+  await click('[data-act=new-menu]'); await sleep(150);
+  ok(await ev(`!!document.querySelector('.sheet [data-act=import-routine]') && !!document.querySelector('#routine-file')`), 'importar rutina: opción en el menú');
+  await ev(`document.querySelector('#routine-file').click = () => {}`);   // sin diálogo de archivos en la prueba
+  await click('.sheet [data-act=import-routine]'); await sleep(150);
+  ok(await ev(`!document.querySelector('.sheet')`), 'importar rutina: el menú se cierra al elegir');
+  await pick('no es json');
+  ok(await ev(`document.querySelector('#toast').textContent === 'Archivo no válido' && location.hash === '#routines'`), 'importar rutina: archivo inválido avisa');
+  await pick(await ev('JSON.stringify(db)'));
+  ok(await ev(`document.querySelector('#toast').textContent.includes('Configuración')`), 'importar rutina: una copia completa indica dónde importarla');
+  const nR = await ev('db.routines.length');
+  await pick(await ev('JSON.stringify(_dl.data)'));
+  ok(await ev(`location.hash === '#edit' && db.draft.name === 'Rutina de prueba' && !db.draft.draftOf && db.draft.days[1].ex.length === 6 && db.draft.days[0].warmup.items[1].name === 'Ranas a 1 pierna'`), 'importar rutina: se abre en el editor como nueva');
+  await ev(`db.draft = null; save()`); await go('routines');
+  // Rutina sola, con la entrada en calor en el formato viejo (texto libre y vueltas).
+  await pick(JSON.stringify({ name: 'Vieja', warmup: { rounds: 2, items: ['10 × Ranas'] }, days: [{ name: 'Día 1', ex: [{ name: 'Remo', sets: 4, reps: '8' }] }] }));
+  ok(await ev(`db.draft?.name === 'Vieja' && JSON.stringify(db.draft.days[0].warmup.items[0]) === '{"name":"Ranas","sets":2,"reps":"10"}' && db.draft.days[0].cooldown.items.length === 0`),
+    'importar rutina: acepta la rutina sola y convierte la entrada en calor vieja');
+  await click('.primary[data-act=ed-save]'); await sleep(300);
+  ok(await ev(`db.routines.length === ${nR} + 1 && db.routines.at(-1).days[0].ex[0].sets === 4`), 'importar rutina: al guardar queda agregada');
+  await go('');
 
   ok(errors.length === 0, 'sin errores de JavaScript' + (errors.length ? ': ' + errors.join(' | ') : ''));
 } catch (e) {
