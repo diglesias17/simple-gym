@@ -168,6 +168,8 @@
   .ex-head h2 { font: 700 23px/1.1 var(--display); }
   .target { font: 700 20px var(--display); color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .prev { font-size: 13px; color: var(--muted); margin: 4px 0 10px; }
+  .sug { display: block; font-weight: 700; color: var(--accent); }
+  .ph-reps { font-weight: 700; }
   .set { display: grid; grid-template-columns: 22px 1fr 1fr 52px; gap: 8px; align-items: center; padding: 4px; margin: 0 -4px; border-radius: 12px; }
   .set.done { background: var(--done-bg); }
   .n { color: var(--muted); font: 700 18px var(--display); text-align: center; font-variant-numeric: tabular-nums; }
@@ -236,12 +238,14 @@
   .inp::placeholder { color: var(--muted); opacity: .7; }
   .ed-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
   .ed-head h2 { font: 700 21px var(--display); }
-  .lbl.inline { display: flex; align-items: center; gap: 8px; }
-  .lbl.inline .inp { margin: 0; width: 64px; height: 38px; padding: 0 8px; }
   .ed-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
   .day-inp { font: 700 21px var(--display); }
   .ed-ex { border-top: 1px solid var(--line); padding: 10px 0 8px; }
-  .ed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ed-ex { container-type: inline-size; }
+  .ed-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; align-items: end; }
+  @container (max-width: 300px) { .ed-grid { grid-template-columns: repeat(2, 1fr); } }
+  /* Chrome en Android dibuja un ▼ en los campos con sugerencias y le reserva espacio al texto. */
+  .inp::-webkit-calendar-picker-indicator { display: none !important; }
   .ed-grid .lbl { margin-top: 0; }
   .ed-tools { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
   .icon-btn { flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--surface-2); font-weight: 700; color: var(--muted); }
@@ -337,8 +341,55 @@ const LEGACY_ROUTINE = {
   ],
 };
 const REST_SECONDS = 90;
-const MAX_ROUNDS = 4;
-const PHASES = [['warmup', 'Entrada en calor', 'Ej.: 10 × Ranas a 1 pierna'], ['cooldown', 'Elongación', 'Ej.: 30" Isquios con banda']];
+const PHASES = [['warmup', 'Entrada en calor', 'Ej.: Ranas a 1 pierna'], ['cooldown', 'Elongación', 'Ej.: Isquios con banda']];
+
+/* ---------- Lista de ejercicios para el autocompletar ---------- */
+// Curada a mano, en español de gimnasio rioplatense. Se suma a los nombres que ya usaste (que tienen prioridad).
+const EXERCISES = [
+  // Piernas y glúteos
+  'Sentadilla con barra', 'Sentadilla frontal', 'Sentadilla copa', 'Sentadilla búlgara', 'Sentadilla Zercher', 'Sentadilla sumo',
+  'Sentadilla en Smith', 'Sentadilla hack', 'Sentadilla a cajón', 'Sentadilla con salto', 'Estocadas', 'Estocadas caminando',
+  'Estocadas hacia atrás', 'Estocada lateral', 'Subidas a cajón', 'Prensa 45°', 'Prensa horizontal', 'Sillón de cuádriceps',
+  'Camilla de isquios', 'Isquios sentado en máquina', 'Peso muerto', 'Peso muerto rumano', 'Peso muerto sumo',
+  'Peso muerto a 1 pierna', 'Peso muerto con barra hexagonal', 'Buenos días', 'Empuje de cadera', 'Empuje de cadera a 1 pierna',
+  'Puente de glúteos', 'Patada de glúteo en polea', 'Abductores en máquina', 'Aductores en máquina', 'Gemelos parado',
+  'Gemelos sentado', 'Gemelos en prensa', 'Curl nórdico', 'Swing con pesa rusa',
+  // Pecho
+  'Press plano con barra', 'Press plano con mancuernas', 'Press inclinado con barra', 'Press inclinado con mancuernas',
+  'Press declinado con barra', 'Press de pecho en máquina', 'Press plano en Smith', 'Aperturas con mancuernas',
+  'Aperturas en polea', 'Cruce de poleas', 'Pec deck', 'Flexiones de brazos', 'Flexiones con rodillas apoyadas',
+  'Fondos en paralelas', 'Pullover con mancuerna',
+  // Espalda
+  'Dominadas', 'Dominadas asistidas', 'Dominadas supinas', 'Polea al pecho', 'Polea al pecho agarre abierto',
+  'Polea al pecho agarre neutro', 'Polea al pecho agarre supino', 'Remo con barra', 'Remo con mancuerna', 'Remo en polea baja',
+  'Remo en máquina', 'Remo hammer', 'Remo en T', 'Remo invertido', 'Pullover en polea', 'Face pull', 'Encogimientos de hombros',
+  'Espinales', 'Espinales en máquina',
+  // Hombros
+  'Press militar con barra', 'Press militar con mancuernas', 'Press de hombros en máquina', 'Press Arnold', 'Vuelos laterales',
+  'Vuelos laterales en polea', 'Vuelos frontales', 'Vuelos posteriores', 'Remo al mentón', 'Rotación externa con banda',
+  'Rotación externa en polea',
+  // Brazos
+  'Curl de bíceps con barra', 'Curl de bíceps con mancuernas', 'Curl martillo', 'Curl concentrado', 'Curl en banco Scott',
+  'Curl de bíceps en polea', 'Curl con barra W', 'Curl inclinado con mancuernas', 'Press francés con barra',
+  'Press francés con mancuerna', 'Extensión de tríceps en polea', 'Extensión de tríceps con soga',
+  'Extensión de tríceps sobre la cabeza', 'Patada de tríceps', 'Fondos en banco', 'Press cerrado',
+  // Zona media
+  'Plancha', 'Plancha lateral', 'Plancha con toque de hombro', 'Abdominales', 'Abdominales bicicleta',
+  'Elevación de piernas colgado', 'Elevación de piernas acostado', 'Bicho muerto', 'Perro pájaro', 'Rueda abdominal',
+  'Press Pallof', 'Giros rusos', 'Leñador en polea', 'Posición hueca', 'Escaladores', 'Paseo del granjero',
+  // Cardio y potencia
+  'Bicicleta fija', 'Cinta', 'Remo ergómetro', 'Elíptico', 'Saltar la soga', 'Burpees', 'Salto al cajón', 'Sogas de batalla',
+];
+const PHASE_ITEMS = [
+  'Movilidad de cadera', 'Movilidad de tobillo', 'Rotación torácica', 'Círculos de brazos', 'Rotaciones de hombros',
+  'Dislocaciones con bastón', 'Gato-camello', 'Estocada con rotación', 'Sentadilla profunda sostenida',
+  'Balanceo de piernas frontal', 'Balanceo de piernas lateral', 'Puente de glúteos', 'Perro pájaro', 'Bicho muerto', 'Plancha',
+  'Activación de glúteo medio con banda', 'Caminata lateral con banda', 'Face pull con banda', 'Saltar la soga',
+  'Bicicleta fija', 'Cinta', 'Remo ergómetro', 'Rodillo de espuma',
+  'Elongación de isquios', 'Elongación de cuádriceps', 'Elongación de psoas', 'Elongación de glúteo', 'Elongación de piramidal',
+  'Elongación de gemelos', 'Elongación de aductores', 'Elongación de pecho', 'Elongación de dorsales', 'Elongación de tríceps',
+  'Elongación de hombros', 'Postura del niño', 'Cobra',
+];
 
 /* ---------- Utilidades ---------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -355,8 +406,20 @@ const clampInt = (v, min, max, def) => { const n = parseInt(v, 10); return Numbe
 // Clave de un ejercicio a partir del nombre: sin tildes ni mayúsculas. Vincula el historial entre rutinas.
 const exKey = name => String(name).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'ejercicio';
-const emptyPhase = () => ({ rounds: 1, items: [] });
-const phaseTotal = p => p ? p.items.length * p.rounds : 0;
+const emptyPhase = () => ({ items: [] });
+const phaseTotal = p => p ? p.items.reduce((n, it) => n + (+it.sets || 1), 0) : 0;
+
+// Ítems de entrada en calor / elongación: { name, sets, reps }, igual que los ejercicios.
+// Antes eran texto libre ("10 × Ranas", '30" Piramidal') con "vueltas" para toda la fase: esas vueltas pasan a ser las series.
+function parsePhaseItem(it, sets = 1) {
+  if (it && typeof it === 'object') return { name: String(it.name ?? ''), sets: it.sets ?? sets, reps: String(it.reps ?? '') };
+  const s = String(it ?? '').trim();
+  const m = s.match(/^(\d+(?:[.,]\d+)?\s*(?:"|''|”|″|s\b|seg\b|min\b|')?)\s*(?:[×x]\s+)?(.+)$/i);
+  return m ? { name: m[2].trim(), sets, reps: m[1].trim() } : { name: s, sets, reps: '' };
+}
+const normPhase = p => p && { items: (p.items || []).map(it => parsePhaseItem(it, p.rounds || 1)) };
+// "10" → "10 ×"; '30"' o "1 min" quedan como están.
+const phaseReps = reps => /^\d+$/.test(reps) ? `${reps} ×` : reps;
 
 // Plan de un día con claves únicas (si un ejercicio se repite en el mismo día, la segunda vez es "-2").
 function makePlan(day) {
@@ -365,7 +428,7 @@ function makePlan(day) {
     let key = exKey(e.name);
     seen[key] = (seen[key] || 0) + 1;
     if (seen[key] > 1) key += '-' + seen[key];
-    return { key, name: e.name, sets: e.sets, reps: e.reps, rest: e.rest || null };
+    return { key, name: e.name, sets: e.sets, reps: e.reps, rest: e.rest || null, weight: e.weight || null };
   });
 }
 
@@ -414,12 +477,23 @@ if (stored && stored.v !== 2) {
   save();
 }
 
+// Pasa los ítems de texto libre al formato { name, reps } en todos lados. No hace nada si ya están convertidos.
+function normalizePhases() {
+  const fix = o => { if (o) for (const [k] of PHASES) if (o[k]) o[k] = normPhase(o[k]); };
+  db.routines.forEach(fix);
+  fix(db.draft);
+  [db.current, ...db.sessions].forEach(s => fix(s?.phases));
+}
+if (/"items":\["|"rounds":/.test(JSON.stringify(db))) { normalizePhases(); save(); }
+
 const routineById = id => db.routines.find(r => r.id === id);
 const activeRoutine = () => routineById(db.activeId) || null;
 
-function lastSets(key) {
+// Últimas series hechas de un ejercicio; con routineId, solo en sesiones de esa rutina.
+function lastSets(key, routineId) {
   for (let i = db.sessions.length - 1; i >= 0; i--) {
     const s = db.sessions[i];
+    if (routineId && s.routineId !== routineId) continue;
     const sets = s.ex?.[key]?.filter(x => x.done);
     if (sets?.length) return { date: s.start, sets };
   }
@@ -587,11 +661,12 @@ function startSession(dayId) {
   }
   const plan = makePlan(day), ex = {};
   for (const e of plan) {
-    const last = lastSets(e.key);
-    ex[e.key] = Array.from({ length: e.sets }, (_, i) => ({
-      w: last ? (last.sets[i] ?? last.sets.at(-1)).w : '',
-      r: '', done: false,
-    }));
+    // Peso a precargar: lo último hecho con esta rutina; si es la primera vez con ella, el sugerido;
+    // si no hay sugerido, lo último hecho con cualquier rutina.
+    const same = lastSets(e.key, r.id), any = lastSets(e.key);
+    const pick = i => (same && (same.sets[i] ?? same.sets.at(-1)).w)
+      || (!same && e.weight) || (any && (any.sets[i] ?? any.sets.at(-1)).w) || '';
+    ex[e.key] = Array.from({ length: e.sets }, (_, i) => ({ w: pick(i), r: '', done: false }));
   }
   db.current = {
     id: uid(), routineId: r.id, routineName: r.name, dayId, dayName: day.name, dayIndex: r.days.indexOf(day), start: Date.now(),
@@ -609,7 +684,7 @@ function exCard(e, sets) {
   return `
   <article class="card ex ${done >= sets.length ? 'complete' : ''}" data-ex="${esc(e.key)}">
     <div class="ex-head"><h2>${esc(e.name)}</h2><span class="target">${e.reps ? `${e.sets} × ${esc(e.reps)}` : `${e.sets} series`}</span></div>
-    <div class="prev">${last ? `Anterior (${fmtDate(last.date)}): ${last.sets.map(fmtSet).join(' · ')}` : 'Primera vez'}</div>
+    <div class="prev">${e.weight ? `<span class="sug">Sugerido: ${esc(e.weight)} kg</span>` : ''}${last ? `Anterior (${fmtDate(last.date)}): ${last.sets.map(fmtSet).join(' · ')}` : 'Primera vez'}</div>
     ${sets.map((x, i) => {
       const ph = (last?.sets[i] ?? last?.sets.at(-1))?.r || firstNum(e.reps);
       return `
@@ -628,25 +703,32 @@ function exCard(e, sets) {
   </article>`;
 }
 
-// Entrada en calor / elongación: lista de ítems con un check por vuelta. Si no tiene ítems, no se muestra.
+// Entrada en calor / elongación: un ítem por fila con un check por serie. Si no tiene ítems, no se muestra.
+// El índice del check (serie × cantidad de ítems + ítem) es el mismo que con las "vueltas" de antes.
 function phaseCard(kind, title) {
   const s = db.current, p = s.phases?.[kind];
   if (!p?.items.length) return '';
-  const st = s[kind] ||= [], total = phaseTotal(p), done = st.filter(Boolean).length;
-  const cols = `style="grid-template-columns: 1fr repeat(${p.rounds}, 48px)"`;
+  const st = s[kind] ||= [], n = p.items.length, total = phaseTotal(p);
+  const sets = it => +it.sets || 1, max = Math.max(...p.items.map(sets));
+  const done = phaseDone(s, kind);
+  const cols = `style="grid-template-columns: 1fr repeat(${max}, 48px)"`;
   return `
     <details class="card phase" ${done < total ? 'open' : ''}>
       <summary><span>${title}</span><span class="count" data-count="${kind}">${done}/${total}</span></summary>
-      ${p.rounds > 1 ? `<div class="wu-head" ${cols}><span></span>${Array.from({ length: p.rounds }, (_, r) => `<span>Vuelta ${r + 1}</span>`).join('')}</div>` : ''}
+      ${max > 1 ? `<div class="wu-head" ${cols}><span></span>${Array.from({ length: max }, (_, r) => `<span>Serie ${r + 1}</span>`).join('')}</div>` : ''}
       ${p.items.map((it, i) => `
-        <div class="wu-row" ${cols}><span>${esc(it)}</span>
-          ${Array.from({ length: p.rounds }, (_, r) => {
-            const k = r * p.items.length + i;
-            return `<button class="check sm ${st[k] ? 'on' : ''}" data-act="phase" data-phase="${kind}" data-k="${k}" aria-label="${p.rounds > 1 ? `Vuelta ${r + 1}` : 'Hecho'}">✓</button>`;
+        <div class="wu-row" ${cols}><span>${it.reps ? `<b class="ph-reps">${esc(phaseReps(it.reps))}</b> ` : ''}${esc(it.name)}</span>
+          ${Array.from({ length: max }, (_, r) => {
+            const k = r * n + i;
+            return r < sets(it)
+              ? `<button class="check sm ${st[k] ? 'on' : ''}" data-act="phase" data-phase="${kind}" data-k="${k}" aria-label="${max > 1 ? `Serie ${r + 1}` : 'Hecho'}">✓</button>`
+              : '<span></span>';
           }).join('')}
         </div>`).join('')}
     </details>`;
 }
+const phaseDone = (s, kind) => (s.phases[kind].items).reduce((c, it, i, a) =>
+  c + Array.from({ length: +it.sets || 1 }, (_, r) => s[kind]?.[r * a.length + i]).filter(Boolean).length, 0);
 
 function renderSession() {
   const s = db.current;
@@ -752,7 +834,7 @@ function renderRoutines() {
 
 /* ---------- Editor de rutinas ---------- */
 // Se edita un borrador (db.draft) que se guarda en cada tecla; la rutina real cambia recién al tocar "Guardar".
-const newEx = () => ({ name: '', sets: '3', reps: '', rest: '' });
+const newEx = () => ({ name: '', sets: '3', reps: '', weight: '', rest: '' });
 const newDay = n => ({ id: uid(), name: `Día ${n}`, ex: [newEx()] });
 
 function openEditor(routine, copy = false) {
@@ -786,18 +868,24 @@ function renderEditor() {
     <button class="primary" data-act="ed-save">Guardar rutina</button>
     <button class="ghost block" data-act="ed-cancel">Cancelar</button>
     </div>
-    ${datalist('ex-names', knownNames(r => r.days.flatMap(day => day.ex.map(e => e.name)), s => (s.plan || []).map(e => e.name)))}
-    ${datalist('phase-items', knownNames(r => [...r.warmup.items, ...r.cooldown.items], s => PHASES.flatMap(([k]) => s.phases?.[k]?.items || [])))}`;
+    ${datalist('ex-names', knownNames(r => r.days.flatMap(day => day.ex.map(e => e.name)), s => (s.plan || []).map(e => e.name), EXERCISES))}
+    ${datalist('phase-items', knownNames(
+      r => [...PHASES.flatMap(([k]) => r[k].items.map(i => i.name)), ...r.days.flatMap(day => day.ex.map(e => e.name))],
+      s => [...PHASES.flatMap(([k]) => (s.phases?.[k]?.items || []).map(i => i.name)), ...(s.plan || []).map(e => e.name)],
+      [...PHASE_ITEMS, ...EXERCISES]))}`;
 }
 
-// Nombres ya usados en rutinas guardadas e historial, para sugerir al escribir.
-// Sin duplicados (por clave de nombre) y con la escritura más reciente.
-function knownNames(fromRoutine, fromSession) {
+// Sugerencias al escribir: primero los nombres que ya usaste (rutinas e historial, con la escritura más reciente),
+// después la lista curada. Sin duplicados por clave de nombre (mayúsculas y tildes no cuentan).
+function knownNames(fromRoutine, fromSession, curated = []) {
   const seen = new Map();
   const add = n => { const k = exKey(n); if (n && !seen.has(k)) seen.set(k, n); };
   [...db.routines].reverse().forEach(r => fromRoutine(r).forEach(add));
   [...db.sessions].reverse().forEach(s => fromSession(s).forEach(add));
-  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'es'));
+  const byName = (a, b) => a.localeCompare(b, 'es');
+  const own = [...seen.values()].sort(byName);
+  curated.forEach(add);   // también descarta repetidos entre las listas curadas
+  return [...own, ...[...seen.values()].slice(own.length).sort(byName)];
 }
 const datalist = (id, names) => `<datalist id="${id}">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>`;
 
@@ -805,18 +893,25 @@ function phaseEditor(kind, title, ph) {
   const p = db.draft[kind];
   return `
     <section class="card">
-      <div class="ed-head"><h2>${title}</h2>
-        <label class="lbl inline">Vueltas
-          <select class="inp" data-p="${kind}.rounds">${Array.from({ length: MAX_ROUNDS }, (_, i) =>
-            `<option ${i + 1 === +p.rounds ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>
-        </label>
-      </div>
+      <div class="ed-head"><h2>${title}</h2></div>
       ${p.items.length ? '' : '<p class="muted hint">Vacía: no aparece en la sesión.</p>'}
-      ${p.items.map((it, i) => `
-        <div class="ed-row">
-          <input class="inp" list="phase-items" data-p="${kind}.items.${i}" value="${esc(it)}" placeholder="${esc(ph)}" autocomplete="off">
-          <button class="icon-btn" data-act="ed-del" data-p="${kind}.items.${i}" aria-label="Quitar ítem">✕</button>
-        </div>`).join('')}
+      ${p.items.map((it, i) => {
+        const path = `${kind}.items.${i}`;
+        return `
+        <div class="ed-ex">
+          <div class="ed-row"><span class="n">${i + 1}</span>
+            <input class="inp" list="phase-items" data-p="${path}.name" value="${esc(it.name)}" placeholder="${esc(ph)}" autocomplete="off"></div>
+          <div class="ed-grid">
+            <label class="lbl">Series<input class="inp" data-p="${path}.sets" value="${esc(it.sets)}" inputmode="numeric" autocomplete="off"></label>
+            <label class="lbl">Reps<input class="inp" data-p="${path}.reps" value="${esc(it.reps)}" placeholder="10" autocomplete="off"></label>
+          </div>
+          <div class="ed-tools">
+            <button class="icon-btn" data-act="ed-move" data-p="${path}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Subir">↑</button>
+            <button class="icon-btn" data-act="ed-move" data-p="${path}" data-dir="1" ${i === p.items.length - 1 ? 'disabled' : ''} aria-label="Bajar">↓</button>
+            <button class="icon-btn" data-act="ed-del" data-p="${path}" aria-label="Quitar ítem">✕</button>
+          </div>
+        </div>`;
+      }).join('')}
       <button class="mini" data-act="ed-add-item" data-phase="${kind}">+ ítem</button>
     </section>`;
 }
@@ -837,6 +932,7 @@ function dayEditor(day, di) {
           <div class="ed-grid">
             <label class="lbl">Series<input class="inp" data-p="${p}.sets" value="${esc(e.sets)}" inputmode="numeric" autocomplete="off"></label>
             <label class="lbl">Reps<input class="inp" data-p="${p}.reps" value="${esc(e.reps)}" placeholder="8–10" autocomplete="off"></label>
+            <label class="lbl">Peso (kg)<input class="inp" data-p="${p}.weight" value="${esc(e.weight ?? '')}" placeholder="—" inputmode="decimal" autocomplete="off"></label>
             <label class="lbl">Descanso (s)<input class="inp" data-p="${p}.rest" value="${esc(e.rest ?? '')}" placeholder="${REST_SECONDS}" inputmode="numeric" autocomplete="off"></label>
           </div>
           <div class="ed-tools">
@@ -867,7 +963,8 @@ function saveDraft() {
   const d = db.draft;
   const name = String(d.name).trim();
   if (!name) { toast('Poné un nombre a la rutina'); return $('[data-p="name"]', app)?.focus(); }
-  const phase = p => ({ rounds: clampInt(p.rounds, 1, MAX_ROUNDS, 1), items: p.items.map(s => String(s).trim()).filter(Boolean) });
+  const phase = p => ({ items: p.items.map(it => parsePhaseItem(it))
+    .map(it => ({ name: it.name.trim(), sets: clampInt(it.sets, 1, 10, 1), reps: it.reps.trim() })).filter(it => it.name) });
   const days = d.days.map((day, i) => ({
     id: day.id || uid(),
     name: String(day.name).trim() || `Día ${i + 1}`,
@@ -875,6 +972,7 @@ function saveDraft() {
       name: String(e.name).trim(),
       sets: clampInt(e.sets, 1, 10, 3),
       reps: String(e.reps ?? '').trim(),
+      weight: String(e.weight ?? '').trim().replace(',', '.') || null,
       rest: String(e.rest ?? '').trim() ? clampInt(e.rest, 10, 600, REST_SECONDS) : null,
     })),
   }));
@@ -909,8 +1007,8 @@ function editorClick(b) {
     }
     case 'ed-add-item': {
       const kind = b.dataset.phase, items = d[kind].items;
-      items.push('');
-      return editAndFocus(`[data-p="${kind}.items.${items.length - 1}"]`), true;
+      items.push({ name: '', sets: items.at(-1)?.sets || '1', reps: '' });
+      return editAndFocus(`[data-p="${kind}.items.${items.length - 1}.name"]`), true;
     }
     case 'ed-del': {
       const [arr, i] = draftRef(b.dataset.p);
@@ -1015,6 +1113,7 @@ async function importData(file) {
     const newRoutines = incoming.filter(r => r?.id && Array.isArray(r.days) && !routineById(r.id));
     db.routines.push(...newRoutines);
     if (!activeRoutine() && db.routines.length) db.activeId = db.routines[0].id;
+    normalizePhases();
     save(); render();
     toast(`${added.length} sesiones y ${newRoutines.length} rutinas importadas`);
   } catch { toast('Archivo no válido'); }
@@ -1050,7 +1149,7 @@ app.addEventListener('click', ev => {
       const kind = b.dataset.phase, k = +b.dataset.k, st = s[kind] ||= [];
       st[k] = !st[k];
       b.classList.toggle('on', st[k]);
-      $(`[data-count="${kind}"]`).textContent = `${st.filter(Boolean).length}/${phaseTotal(s.phases[kind])}`;
+      $(`[data-count="${kind}"]`).textContent = `${phaseDone(s, kind)}/${phaseTotal(s.phases[kind])}`;
       save(); break;
     }
     case 'set': toggleSet(b); break;
